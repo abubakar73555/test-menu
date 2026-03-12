@@ -9,15 +9,16 @@ export default {
       return new Response(renderLanding(), { headers: { "Content-Type": "text/html; charset=utf-8" } });
     }
 
-    // المنطق المطور للتسجيل (التعديل الذي طلبته)
+    // --- 2. منطق التسجيل المطور مع معالجة الأخطاء الذكية ---
     if (pathname === "/register" && request.method === "POST") {
       try {
         const data = await request.formData();
         const name = data.get("res_name");
-        // تنظيف الـ slug وتحويله لشكل صالح للروابط
+        // تنظيف الـ slug وتحويله لشكل صالح للروابط (مثلاً: "مطعم البركة" يصبح "al-baraka")
         const slug = data.get("slug").toLowerCase().trim().replace(/\s+/g, '-');
         const pass = data.get("password");
 
+        // محاولة الإدخال في قاعدة البيانات D1
         await env.DB.prepare("INSERT INTO restaurants (res_name, slug, admin_password) VALUES (?, ?, ?)")
           .bind(name, slug, pass).run();
 
@@ -33,19 +34,27 @@ export default {
           </body></html>`, { headers: { "Content-Type": "text/html; charset=utf-8" } });
 
       } catch (e) {
+        // التعديل السحري: كشف السبب الحقيقي للخطأ
+        let errorMsg = e.message.includes("UNIQUE") 
+          ? "الرابط محجوز مسبقاً، اختر اسماً آخر (Slug) مختلف." 
+          : "خطأ في قاعدة البيانات: " + e.message;
+          
         return new Response(`
           <html dir="rtl"><body style="font-family:Tahoma; text-align:center; padding:50px;">
-            <h1 style="color:red;">❌ عذراً، الرابط محجوز مسبقاً!</h1>
-            <p>الاسم الذي اخترته مستخدم من قبل مطعم آخر، يرجى اختيار اسم رابط (Slug) مختلف.</p>
-            <button onclick="history.back()">العودة للمحاولة مرة أخرى</button>
+            <h1 style="color:red;">❌ فشل التسجيل</h1>
+            <p style="font-size:18px;">${errorMsg}</p>
+            <hr>
+            <p style="color:#666; font-size:12px;">نصيحة: تأكد من إنشاء الجداول في D1 Console وتحديث المعرف في wrangler.toml</p>
+            <button onclick="history.back()" style="padding:10px 20px; cursor:pointer;">العودة للمحاولة مرة أخرى</button>
           </body></html>`, { headers: { "Content-Type": "text/html; charset=utf-8" } });
       }
     }
 
-    // --- 2. لوحة تحكم المطعم الخاص: /admin/[slug] ---
+    // --- 3. لوحة تحكم المطعم الخاص: /admin/[slug] ---
     if (parts[0] === "admin" && parts[1]) {
       const slug = parts[1];
       const res = await env.DB.prepare("SELECT * FROM restaurants WHERE slug = ?").bind(slug).first();
+      
       if (!res) return new Response("المطعم غير موجود", { status: 404 });
 
       // معالجة إضافة وحذف الوجبات
@@ -65,10 +74,11 @@ export default {
       return new Response(renderAdmin(res, items, url.origin), { headers: { "Content-Type": "text/html; charset=utf-8" } });
     }
 
-    // --- 3. عرض منيو المطعم للزبائن: /menu/[slug] ---
+    // --- 4. عرض منيو المطعم للزبائن: /menu/[slug] ---
     if (parts[0] === "menu" && parts[1]) {
       const slug = parts[1];
       const res = await env.DB.prepare("SELECT * FROM restaurants WHERE slug = ?").bind(slug).first();
+      
       if (!res) return new Response("المطعم غير موجود", { status: 404 });
 
       const { results: items } = await env.DB.prepare("SELECT * FROM items WHERE restaurant_id = ?").bind(res.id).all();
@@ -110,15 +120,15 @@ function renderAdmin(res, items, origin) {
       <form method="POST" style="margin:0;">
         <input type="hidden" name="id" value="${i.id}">
         <input type="hidden" name="action" value="delete">
-        <button style="background:red; color:white; border:none; border-radius:3px; cursor:pointer;">حذف</button>
+        <button style="background:red; color:white; border:none; border-radius:3px; cursor:pointer; padding:5px 10px;">حذف</button>
       </form>
     </li>`).join('');
 
   return `<html dir="rtl"><head><meta charset="UTF-8"><style>
     body { font-family: Tahoma; padding: 20px; background: #f4f7f6; }
     .card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); max-width: 600px; margin: auto; }
-    .qr-box { text-align: center; background: #e3f2fd; padding: 15px; border-radius: 10px; margin-bottom: 20px; }
-    input { padding: 8px; border: 1px solid #ddd; border-radius: 4px; }
+    .qr-box { text-align: center; background: #e3f2fd; padding: 15px; border-radius: 10px; margin-bottom: 20px; border: 1px dashed #2196f3; }
+    input { padding: 8px; border: 1px solid #ddd; border-radius: 4px; margin: 5px; }
   </style></head>
   <body>
     <div class="card">
@@ -134,13 +144,13 @@ function renderAdmin(res, items, origin) {
       <form method="POST">
         <input type="hidden" name="action" value="add">
         <input name="name" placeholder="اسم الطبق" required>
-        <input name="price" type="number" placeholder="السعر" required>
-        <button style="background:green; color:white; border:none; padding:8px 15px; border-radius:4px;">إضافة</button>
+        <input name="price" type="number" step="0.01" placeholder="السعر" required>
+        <button style="background:green; color:white; border:none; padding:8px 15px; border-radius:4px; cursor:pointer;">إضافة</button>
       </form>
 
       <hr>
       <h3>🍽️ الأطباق الحالية</h3>
-      <ul style="padding:0;">${rows || "لا توجد أطباق بعد."}</ul>
+      <ul style="padding:0; list-style:none;">${rows || "لا توجد أطباق بعد."}</ul>
       <br><a href="/">العودة للرئيسية</a>
     </div>
   </body></html>`;
