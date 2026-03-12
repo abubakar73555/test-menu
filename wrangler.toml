@@ -2,13 +2,11 @@ name = "test-menu"
 main = "src/index.js"
 compatibility_date = "2024-03-12"
 
-# ربط قاعدة البيانات D1 التي أنشأتها
 [[d1_databases]]
-binding = "DB" 
+binding = "DB"
 database_name = "menu_db"
-database_id = "81107e96-c3f0-4470-b44b-4c070248f06a"
+database_id = "81107e96-c3f0-4470-b6b9-35cb6c6a2311"
 
-# ربط مخزن الصور R2 الذي أنشأته
 [[r2_buckets]]
 binding = "BUCKET"
 bucket_name = "menu-images"
