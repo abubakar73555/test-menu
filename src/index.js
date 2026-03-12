@@ -4,60 +4,56 @@ export default {
     const pathname = url.pathname;
     const parts = pathname.split('/').filter(Boolean);
 
-    // --- 1. صفحة التسجيل للمطاعم الجديدة (SaaS Landing) ---
+    // --- 1. الصفحة الرئيسية (Landing Page) ---
     if (pathname === "/" && request.method === "GET") {
       return new Response(renderLanding(), { headers: { "Content-Type": "text/html; charset=utf-8" } });
     }
 
-    // --- 2. منطق التسجيل المطور مع معالجة الأخطاء الذكية ---
+    // --- 2. منطق التسجيل (المكان الذي يظهر فيه الخطأ) ---
     if (pathname === "/register" && request.method === "POST") {
       try {
         const data = await request.formData();
         const name = data.get("res_name");
-        // تنظيف الـ slug وتحويله لشكل صالح للروابط (مثلاً: "مطعم البركة" يصبح "al-baraka")
+        // تحويل النص لرابط صالح (slug)
         const slug = data.get("slug").toLowerCase().trim().replace(/\s+/g, '-');
         const pass = data.get("password");
 
-        // محاولة الإدخال في قاعدة البيانات D1
+        // محاولة الحفظ في D1
         await env.DB.prepare("INSERT INTO restaurants (res_name, slug, admin_password) VALUES (?, ?, ?)")
           .bind(name, slug, pass).run();
 
         return new Response(`
           <html dir="rtl"><body style="font-family:Tahoma; text-align:center; padding:50px;">
             <h1 style="color:green;">✅ تم إنشاء مطعمك بنجاح!</h1>
-            <p style="font-size:18px;">اسم المطعم: <b>${name}</b></p>
+            <p>اسم المطعم: <b>${name}</b></p>
             <div style="background:#eee; padding:20px; display:inline-block; border-radius:10px;">
-              <p>🔗 رابط المنيو للزبائن: <a href="/menu/${slug}">/menu/${slug}</a></p>
-              <p>⚙️ لوحة التحكم للإدارة: <a href="/admin/${slug}">/admin/${slug}</a></p>
+              <p>🔗 رابط المنيو: <a href="/menu/${slug}">/menu/${slug}</a></p>
+              <p>⚙️ لوحة التحكم: <a href="/admin/${slug}">/admin/${slug}</a></p>
             </div>
             <br><br><a href="/">العودة للرئيسية</a>
           </body></html>`, { headers: { "Content-Type": "text/html; charset=utf-8" } });
 
       } catch (e) {
-        // التعديل السحري: كشف السبب الحقيقي للخطأ
-        let errorMsg = e.message.includes("UNIQUE") 
-          ? "الرابط محجوز مسبقاً، اختر اسماً آخر (Slug) مختلف." 
-          : "خطأ في قاعدة البيانات: " + e.message;
-          
+        // إذا فشل الكود، سيعطيك السبب الحقيقي باللون الأحمر
         return new Response(`
           <html dir="rtl"><body style="font-family:Tahoma; text-align:center; padding:50px;">
-            <h1 style="color:red;">❌ فشل التسجيل</h1>
-            <p style="font-size:18px;">${errorMsg}</p>
-            <hr>
-            <p style="color:#666; font-size:12px;">نصيحة: تأكد من إنشاء الجداول في D1 Console وتحديث المعرف في wrangler.toml</p>
-            <button onclick="history.back()" style="padding:10px 20px; cursor:pointer;">العودة للمحاولة مرة أخرى</button>
-          </body></html>`, { headers: { "Content-Type": "text/html; charset=utf-8" } });
+            <h1 style="color:red;">❌ حدث خطأ تقني</h1>
+            <p style="background:#fff3f3; border:1px solid red; padding:15px; display:inline-block;">
+              السبب الحقيقي: <b>${e.message}</b>
+            </p>
+            <p>إذا كان الخطأ "no such table"، فأنت لم تنشئ الجداول بعد في Console.</p>
+            <p>إذا كان الخطأ "D1_ERROR"، فتأكد من المعرف (ID) في wrangler.toml.</p>
+            <br><button onclick="history.back()">العودة للمحاولة</button>
+          </body></html>`, { headers: { "Content-Type": "text/html; charset=utf-8" }, status: 500 });
       }
     }
 
-    // --- 3. لوحة تحكم المطعم الخاص: /admin/[slug] ---
+    // --- 3. لوحة التحكم (Admin) ---
     if (parts[0] === "admin" && parts[1]) {
       const slug = parts[1];
       const res = await env.DB.prepare("SELECT * FROM restaurants WHERE slug = ?").bind(slug).first();
-      
       if (!res) return new Response("المطعم غير موجود", { status: 404 });
 
-      // معالجة إضافة وحذف الوجبات
       if (request.method === "POST") {
         const data = await request.formData();
         const action = data.get("action");
@@ -65,8 +61,7 @@ export default {
           await env.DB.prepare("INSERT INTO items (restaurant_id, name, price) VALUES (?, ?, ?)")
             .bind(res.id, data.get("name"), data.get("price")).run();
         } else if (action === "delete") {
-          await env.DB.prepare("DELETE FROM items WHERE id = ? AND restaurant_id = ?")
-            .bind(data.get("id"), res.id).run();
+          await env.DB.prepare("DELETE FROM items WHERE id = ? AND restaurant_id = ?").bind(data.get("id"), res.id).run();
         }
       }
 
@@ -74,13 +69,11 @@ export default {
       return new Response(renderAdmin(res, items, url.origin), { headers: { "Content-Type": "text/html; charset=utf-8" } });
     }
 
-    // --- 4. عرض منيو المطعم للزبائن: /menu/[slug] ---
+    // --- 4. عرض المنيو (Public Menu) ---
     if (parts[0] === "menu" && parts[1]) {
       const slug = parts[1];
       const res = await env.DB.prepare("SELECT * FROM restaurants WHERE slug = ?").bind(slug).first();
-      
       if (!res) return new Response("المطعم غير موجود", { status: 404 });
-
       const { results: items } = await env.DB.prepare("SELECT * FROM items WHERE restaurant_id = ?").bind(res.id).all();
       return new Response(renderPublicMenu(res, items), { headers: { "Content-Type": "text/html; charset=utf-8" } });
     }
@@ -89,23 +82,22 @@ export default {
   }
 };
 
-// --- القوالب التصميمية (Templates) ---
+// --- القوالب (Templates) ---
 
 function renderLanding() {
   return `<html dir="rtl"><head><meta charset="UTF-8"><style>
     body { font-family: Tahoma; text-align: center; padding: 50px; background: #f0f2f5; }
     form { background: white; padding: 30px; display: inline-block; border-radius: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
     input { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ddd; border-radius: 5px; }
-    button { background: #007bff; color: white; border: none; padding: 12px 25px; border-radius: 5px; cursor: pointer; width: 100%; font-weight: bold; }
+    button { background: #007bff; color: white; border: none; padding: 12px 25px; border-radius: 5px; cursor: pointer; width: 100%; }
   </style></head>
   <body>
-    <h1>🚀 منصة المنيو الذكي (SaaS)</h1>
-    <p>أنشئ منيو مطعمك في ثوانٍ واحصل على كود QR خاص بك</p>
+    <h1>🚀 منصة المنيو الذكي</h1>
     <form action="/register" method="POST">
-      <input name="res_name" placeholder="اسم المطعم (مثلاً: مطعم الذواق)" required>
-      <input name="slug" placeholder="اسم الرابط بالإنجليزية (مثلاً: althawaq)" required>
-      <input name="password" type="password" placeholder="كلمة مرور لوحة التحكم" required>
-      <button type="submit">ابدأ الآن مجاناً</button>
+      <input name="res_name" placeholder="اسم المطعم" required>
+      <input name="slug" placeholder="الرابط (مثلاً: pizza-club)" required>
+      <input name="password" type="password" placeholder="كلمة المرور" required>
+      <button type="submit">إنشاء الحساب</button>
     </form>
   </body></html>`;
 }
@@ -113,60 +105,20 @@ function renderLanding() {
 function renderAdmin(res, items, origin) {
   const menuUrl = `${origin}/menu/${res.slug}`;
   const qrUrl = `https://chart.googleapis.com/chart?chs=200x200&cht=qr&chl=${encodeURIComponent(menuUrl)}&choe=UTF-8`;
-
-  const rows = items.map(i => `
-    <li style="background:#f9f9f9; padding:10px; margin:5px 0; border-radius:5px; display:flex; justify-content:space-between; align-items:center;">
-      <span><b>${i.name}</b> - ${i.price} ريال</span>
-      <form method="POST" style="margin:0;">
-        <input type="hidden" name="id" value="${i.id}">
-        <input type="hidden" name="action" value="delete">
-        <button style="background:red; color:white; border:none; border-radius:3px; cursor:pointer; padding:5px 10px;">حذف</button>
-      </form>
-    </li>`).join('');
-
-  return `<html dir="rtl"><head><meta charset="UTF-8"><style>
-    body { font-family: Tahoma; padding: 20px; background: #f4f7f6; }
-    .card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); max-width: 600px; margin: auto; }
-    .qr-box { text-align: center; background: #e3f2fd; padding: 15px; border-radius: 10px; margin-bottom: 20px; border: 1px dashed #2196f3; }
-    input { padding: 8px; border: 1px solid #ddd; border-radius: 4px; margin: 5px; }
-  </style></head>
-  <body>
-    <div class="card">
-      <h2>⚙️ لوحة تحكم: ${res.res_name}</h2>
-      
-      <div class="qr-box">
-        <p><b>كود QR الخاص بمنيو مطعمك:</b></p>
-        <img src="${qrUrl}" alt="QR Code"><br>
-        <small><a href="${menuUrl}" target="_blank">${menuUrl}</a></small>
-      </div>
-
-      <h3>➕ إضافة طبق جديد</h3>
-      <form method="POST">
-        <input type="hidden" name="action" value="add">
-        <input name="name" placeholder="اسم الطبق" required>
-        <input name="price" type="number" step="0.01" placeholder="السعر" required>
-        <button style="background:green; color:white; border:none; padding:8px 15px; border-radius:4px; cursor:pointer;">إضافة</button>
-      </form>
-
-      <hr>
-      <h3>🍽️ الأطباق الحالية</h3>
-      <ul style="padding:0; list-style:none;">${rows || "لا توجد أطباق بعد."}</ul>
-      <br><a href="/">العودة للرئيسية</a>
+  const rows = items.map(i => `<li>${i.name} - ${i.price} ريال <form method="POST" style="display:inline;"><input type="hidden" name="id" value="${i.id}"><input type="hidden" name="action" value="delete"><button>حذف</button></form></li>`).join('');
+  
+  return `<html dir="rtl"><body style="font-family:Tahoma; padding:20px;">
+    <h2>لوحة تحكم: ${res.res_name}</h2>
+    <div style="border:1px dashed #ccc; padding:10px; text-align:center; margin-bottom:20px;">
+      <p>كود QR الخاص بك:</p>
+      <img src="${qrUrl}"><br><small>${menuUrl}</small>
     </div>
+    <form method="POST"><input type="hidden" name="action" value="add"><input name="name" placeholder="الصنف"><input name="price" placeholder="السعر"><button>إضافة</button></form>
+    <ul>${rows}</ul>
   </body></html>`;
 }
 
 function renderPublicMenu(res, items) {
-  const cards = items.map(i => `
-    <div style="background:white; border:1px solid #eee; padding:15px; margin:10px; border-radius:12px; width:200px; box-shadow:0 2px 5px rgba(0,0,0,0.05);">
-      <h3 style="margin:0 0 10px 0;">${i.name}</h3>
-      <p style="color:#2ecc71; font-weight:bold; margin:0;">${i.price} ريال</p>
-    </div>`).join('');
-
-  return `<html dir="rtl"><head><meta charset="UTF-8"></head>
-  <body style="font-family:Tahoma; text-align:center; background:#fafafa; padding:20px;">
-    <h1 style="color:#2c3e50;">🍽️ منيو ${res.res_name}</h1>
-    <div style="display:flex; flex-wrap:wrap; justify-content:center;">${cards || "قريباً..."}</div>
-    <p style="margin-top:50px; font-size:12px; color:#aaa;">بواسطة منصة المنيو الذكي</p>
-  </body></html>`;
+  const cards = items.map(i => `<div style="border:1px solid #ddd; padding:15px; margin:10px; border-radius:10px;"><h3>${i.name}</h3><p>${i.price} ريال</p></div>`).join('');
+  return `<html dir="rtl"><body style="font-family:Tahoma; text-align:center;"><h1>منيو ${res.res_name}</h1><div style="display:flex; flex-wrap:wrap; justify-content:center;">${cards || "قريباً..."}</div></body></html>`;
 }
