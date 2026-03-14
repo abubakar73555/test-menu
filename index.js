@@ -239,7 +239,7 @@ async function handleMasterRoute(request, env) {
     return Response.redirect(new URL("/", request.url));
 
   const url = new URL(request.url);
-  const searchParams = url.searchParams; // ✅ تمرير searchParams إلى دالة العرض
+  const searchParams = url.searchParams;
 
   if (request.method === "POST") {
     const data = await request.formData();
@@ -287,7 +287,6 @@ async function handleMasterRoute(request, env) {
   });
 }
 
-// ✅ تعديل الدالة لاستقبال searchParams بدلاً من استخدام globalThis.location
 function renderMasterHTML(restaurants, stats, searchParams, errorMsg = "") {
   const today = new Date().toISOString().split('T')[0];
   const expiredCount = restaurants.filter(r => r.expires_at < today).length;
@@ -319,7 +318,6 @@ function renderMasterHTML(restaurants, stats, searchParams, errorMsg = "") {
     </tr>`;
   }).join('');
 
-  // ✅ استخدام searchParams بدلاً من globalThis.location
   const searchParam = searchParams?.get("search") || "";
   const statusParam = searchParams?.get("status") || "all";
 
