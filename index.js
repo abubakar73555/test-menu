@@ -128,7 +128,7 @@ async function handleImageUpload(request, env) {
   });
 
   // استبدل <your-account-hash> بالرابط الصحيح لحسابك
-  const publicUrl = `https://pub-8492350ec79a4231b2283bbb5774d67d.r2.dev/${fileName}`; 
+  const publicUrl = `const publicUrl = `https://images.topsafetypro.com/${fileName}`; 
 
   return new Response(JSON.stringify({ url: publicUrl }), {
     headers: { "Content-Type": "application/json" }
