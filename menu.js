@@ -568,33 +568,55 @@ function renderPublicMenuHTML(res, categories, uncategorized, settings, tableNam
         font-size: 1.5rem;
       }
     }
-    /* تحسينات للجوال */
-@media (max-width: 768px) {
-  .floating-cart {
-    bottom: 15px;
-    left: 15px;
-  }
-  .cart-toggle {
-    width: 50px;
-    height: 50px;
-    font-size: 1.3rem;
-  }
-  .cart-panel {
-    width: calc(100% - 30px);
-    left: 15px;
-    right: 15px;
-    bottom: 80px;
-    max-width: none;
-  }
-  .cart-item {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 5px;
-  }
-  .cart-item-actions {
-    align-self: flex-end;
-  }
-}
+    /* تحسينات قوية للجوال */
+    @media (max-width: 768px) {
+      .floating-cart {
+        bottom: 15px !important;
+        left: 15px !important;
+        z-index: 10000 !important;
+      }
+      .cart-toggle {
+        width: 55px !important;
+        height: 55px !important;
+        font-size: 1.5rem !important;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.3) !important;
+      }
+      .cart-panel {
+        width: calc(100% - 30px) !important;
+        max-width: 350px !important;
+        left: 15px !important;
+        right: auto !important;
+        bottom: 80px !important;
+        max-height: 60vh !important;
+        background: white !important;
+        border-radius: 15px !important;
+        box-shadow: 0 5px 25px rgba(0,0,0,0.3) !important;
+        padding: 15px !important;
+        z-index: 10001 !important;
+      }
+      .cart-item {
+        flex-direction: row !important;
+        align-items: center !important;
+        gap: 5px !important;
+        font-size: 14px !important;
+      }
+      .cart-item-actions button {
+        width: 35px !important;
+        height: 35px !important;
+        font-size: 1.1rem !important;
+      }
+      .cart-count {
+        width: 22px !important;
+        height: 22px !important;
+        font-size: 12px !important;
+        right: -5px !important;
+        top: -5px !important;
+      }
+      .whatsapp-btn {
+        padding: 12px !important;
+        font-size: 1rem !important;
+      }
+    }
   `;
 
   const tableMessage = tableName ? `<div class="table-badge">🪑 ${tableName}</div>` : '';
@@ -686,7 +708,7 @@ function renderPublicMenuHTML(res, categories, uncategorized, settings, tableNam
 
   <!-- السلة العائمة -->
   <div class="floating-cart">
-    <button class="cart-toggle" onclick="toggleCart()">
+    <button class="cart-toggle" id="cartToggleButton">
       🛒
       <span class="cart-count" id="cartCount">0</span>
     </button>
@@ -744,8 +766,10 @@ function renderPublicMenuHTML(res, categories, uncategorized, settings, tableNam
   }
 
   function updateCartCount() {
-    const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
-    document.getElementById('cartCount').innerText = totalItems;
+    const countEl = document.getElementById('cartCount');
+    if (countEl) {
+      countEl.innerText = cart.reduce((sum, item) => sum + item.quantity, 0);
+    }
   }
 
   async function openOptionsModal(id, name, price) {
@@ -826,11 +850,13 @@ function renderPublicMenuHTML(res, categories, uncategorized, settings, tableNam
     
     saveCart();
     // إظهار السلة بعد الإضافة مباشرة
-    toggleCart(true);
+    showCart();
   }
 
   function updateCartPanel() {
     const panel = document.getElementById('cartPanel');
+    if (!panel) return;
+    
     if (cart.length === 0) {
       panel.innerHTML = '<p style="text-align:center;">السلة فارغة</p>';
       return;
@@ -865,19 +891,30 @@ function renderPublicMenuHTML(res, categories, uncategorized, settings, tableNam
     panel.innerHTML = html;
   }
 
-  function toggleCart(forceShow) {
+  function showCart() {
+    const panel = document.getElementById('cartPanel');
+    if (panel) {
+      panel.classList.add('show');
+    }
+  }
+
+  function hideCart() {
+    const panel = document.getElementById('cartPanel');
+    if (panel) {
+      panel.classList.remove('show');
+    }
+  }
+
+  function toggleCart() {
     const panel = document.getElementById('cartPanel');
     if (!panel) return;
     
-    if (forceShow === true) {
-      panel.classList.add('show');
-    } else {
-      panel.classList.toggle('show');
-    }
-    
     if (cart.length === 0) {
       panel.classList.remove('show');
+      return;
     }
+    
+    panel.classList.toggle('show');
   }
 
   function updateQuantity(index, delta) {
@@ -896,6 +933,7 @@ function renderPublicMenuHTML(res, categories, uncategorized, settings, tableNam
   function clearCart() {
     cart = [];
     saveCart();
+    hideCart();
   }
 
   function sendOrder() {
@@ -924,55 +962,33 @@ function renderPublicMenuHTML(res, categories, uncategorized, settings, tableNam
     window.open(\`https://wa.me/\${phone}?text=\${encodeURIComponent(orderText)}\`, '_blank');
   }
 
-  // ربط الأحداث بعد تحميل الصفحة
-  document.addEventListener('DOMContentLoaded', function() {
-    console.log('DOM جاهز، جاري ربط الأحداث');
-    
+  // ربط الأحداث يدوياً لضمان العمل على الجوال
+  function bindEvents() {
     // ربط زر السلة
-    const cartToggle = document.querySelector('.cart-toggle');
+    const cartToggle = document.getElementById('cartToggleButton');
     if (cartToggle) {
+      cartToggle.removeEventListener('click', toggleCart);
+      cartToggle.removeEventListener('touchstart', toggleCart);
       cartToggle.addEventListener('click', function(e) {
+        e.preventDefault();
+        toggleCart();
+      });
+      cartToggle.addEventListener('touchstart', function(e) {
         e.preventDefault();
         toggleCart();
       });
     }
     
     // ربط أزرار الإضافة
-    const buttons = document.querySelectorAll('.add-to-cart-btn');
-    console.log('عدد أزرار الإضافة:', buttons.length);
-    
-    buttons.forEach(btn => {
-      btn.addEventListener('click', function(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        const id = this.dataset.id;
-        const name = this.dataset.name;
-        const price = parseFloat(this.dataset.price);
-        console.log('تم النقر على زر الإضافة:', name);
-        openOptionsModal(id, name, price);
-      });
-    });
-    
-    // تحديث السلة
-    updateCartCount();
-    updateCartPanel();
-  });
-
-  // إعادة ربط الأحداث إذا تم تغيير DOM ديناميكياً (للبحث)
-  const searchInput = document.getElementById('searchInput');
-  if (searchInput) {
-    searchInput.addEventListener('input', function() {
-      // بعد تغيير نتائج البحث، قد تحتاج الأزرار الجديدة إلى ربط
-      setTimeout(function() {
-        document.querySelectorAll('.add-to-cart-btn').forEach(btn => {
-          btn.removeEventListener('click', btnClickHandler);
-          btn.addEventListener('click', btnClickHandler);
-        });
-      }, 100);
+    document.querySelectorAll('.add-to-cart-btn').forEach(btn => {
+      btn.removeEventListener('click', handleAddClick);
+      btn.removeEventListener('touchstart', handleAddClick);
+      btn.addEventListener('click', handleAddClick);
+      btn.addEventListener('touchstart', handleAddClick);
     });
   }
 
-  function btnClickHandler(e) {
+  function handleAddClick(e) {
     e.preventDefault();
     e.stopPropagation();
     const btn = e.currentTarget;
@@ -981,6 +997,34 @@ function renderPublicMenuHTML(res, categories, uncategorized, settings, tableNam
     const price = parseFloat(btn.dataset.price);
     openOptionsModal(id, name, price);
   }
+
+  // تشغيل الربط بعد تحميل الصفحة وبعد أي تغيير في DOM
+  document.addEventListener('DOMContentLoaded', function() {
+    bindEvents();
+    updateCartCount();
+    updateCartPanel();
+  });
+
+  // إعادة الربط عند إجراء بحث (لأن العناصر قد تتغير)
+  const searchInput = document.getElementById('searchInput');
+  if (searchInput) {
+    searchInput.addEventListener('input', function() {
+      setTimeout(bindEvents, 100);
+    });
+  }
+
+  // إغلاق السلة عند النقر خارجها (لتحسين تجربة الجوال)
+  document.addEventListener('click', function(e) {
+    const panel = document.getElementById('cartPanel');
+    const toggle = document.getElementById('cartToggleButton');
+    if (panel && toggle && !panel.contains(e.target) && !toggle.contains(e.target)) {
+      panel.classList.remove('show');
+    }
+  });
+
+  // تهيئة أولية
+  updateCartCount();
+  updateCartPanel();
 </script>
 </body>
 </html>`;
