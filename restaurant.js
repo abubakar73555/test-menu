@@ -144,6 +144,10 @@ const tablesHtml = tables.map(t => `
       <button style="background:red; color:white; border:none; padding:2px 8px; border-radius:3px;">🗑️</button>
     </form>
     <a href="/menu/${res.slug}?table=${t.id}" target="_blank" style="background:${settings.primary_color}; color:white; padding:2px 8px; border-radius:3px; text-decoration:none;">🔗</a>
+    <a href="https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=${encodeURIComponent(origin + '/menu/' + res.slug + '?table=' + t.id)}" 
+       target="_blank" 
+       title="تحميل QR للطباعة (بحجم كبير)" 
+       style="background:#28a745; color:white; padding:2px 8px; border-radius:3px; text-decoration:none;">🖨️</a>
     <img src="https://api.qrserver.com/v1/create-qr-code/?size=60x60&data=${encodeURIComponent(origin + '/menu/' + res.slug + '?table=' + t.id)}" 
          style="width:50px; height:50px; border-radius:5px; cursor:pointer;" 
          title="QR code لـ ${t.table_name}" 
