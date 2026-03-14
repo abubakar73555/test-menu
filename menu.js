@@ -12,7 +12,14 @@ export async function handlePublicMenuRoute(env, slug, url) {
 
   const info = await getRestaurantInfo(env, res.id);
   const settings = await getRestaurantSettings(env, res.id);
-  const table = url.searchParams.get("table") || null;
+  const tableId = url.searchParams.get("table") || null;
+  
+  // جلب اسم الطاولة إذا كان tableId موجوداً
+  let tableName = null;
+  if (tableId) {
+    const table = await env.DB.prepare("SELECT table_name FROM tables WHERE id = ? AND restaurant_id = ?").bind(tableId, res.id).first();
+    tableName = table ? table.table_name : `طاولة ${tableId}`;
+  }
 
   const { results: categories } = await env.DB.prepare(`
     SELECT c.*, 
@@ -27,7 +34,7 @@ export async function handlePublicMenuRoute(env, slug, url) {
     SELECT * FROM items WHERE restaurant_id = ? AND category_id IS NULL ORDER BY featured DESC, name
   `).bind(res.id).all();
 
-  return new Response(renderPublicMenuHTML(res, categories, uncategorized, settings, table, info), {
+  return new Response(renderPublicMenuHTML(res, categories, uncategorized, settings, tableName, info), {
     headers: { "Content-Type": "text/html; charset=utf-8" }
   });
 }
@@ -70,7 +77,7 @@ export async function handleOptionsAPI(env, itemId) {
 // ==========================================
 // دوال عرض HTML
 // ==========================================
-function renderPublicMenuHTML(res, categories, uncategorized, settings, table, info) {
+function renderPublicMenuHTML(res, categories, uncategorized, settings, tableName, info) {
   const themeStyles = `
     @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700&family=Tajawal:wght@300;400;500;700&display=swap');
     
@@ -563,7 +570,7 @@ function renderPublicMenuHTML(res, categories, uncategorized, settings, table, i
     }
   `;
 
-  const tableMessage = table ? `<div class="table-badge">🪑 طاولة رقم ${table}</div>` : '';
+  const tableMessage = tableName ? `<div class="table-badge">🪑 ${tableName}</div>` : '';
 
   let categoriesHtml = '';
   for (let cat of categories) {
@@ -832,7 +839,7 @@ function renderPublicMenuHTML(res, categories, uncategorized, settings, table, i
       if (!phone) return alert('رقم واتساب المطعم غير مضبوط');
 
       let orderText = 'طلب جديد من المنيو';
-      if ("${table}") orderText += ' (طاولة رقم ${table})';
+      if ("${tableName}") orderText += ' (' + "${tableName}" + ')';
       orderText += ':\\n';
       let total = 0;
       
