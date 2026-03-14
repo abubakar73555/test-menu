@@ -40,18 +40,25 @@ export async function handlePublicMenuRoute(env, slug, url) {
 }
 
 // ==========================================
-// صفحة "عن المطعم"
+// صفحة "عن المطعم" (مع try/catch للتشخيص)
 // ==========================================
 export async function handleAboutRoute(env, slug) {
-  const res = await getRestaurantBySlug(env, slug);
-  if (!res) return new Response("المطعم غير موجود", { status: 404 });
+  try {
+    const res = await getRestaurantBySlug(env, slug);
+    if (!res) return new Response("المطعم غير موجود", { status: 404 });
 
-  const info = await getRestaurantInfo(env, res.id);
-  const settings = await getRestaurantSettings(env, res.id);
+    const info = await getRestaurantInfo(env, res.id);
+    const settings = await getRestaurantSettings(env, res.id);
 
-  return new Response(renderAboutHTML(res, info, settings), {
-    headers: { "Content-Type": "text/html; charset=utf-8" }
-  });
+    return new Response(renderAboutHTML(res, info, settings), {
+      headers: { "Content-Type": "text/html; charset=utf-8" }
+    });
+  } catch (err) {
+    return new Response(JSON.stringify({ error: err.message, stack: err.stack }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" }
+    });
+  }
 }
 
 // ==========================================
@@ -545,6 +552,7 @@ function renderPublicMenuHTML(res, categories, uncategorized, settings, tableNam
       font-weight: 600;
     }
 
+    /* تحسينات للجوال */
     @media (max-width: 768px) {
       .restaurant-name {
         font-size: 2rem;
@@ -556,6 +564,15 @@ function renderPublicMenuHTML(res, categories, uncategorized, settings, tableNam
         width: calc(100% - 40px);
         left: 20px;
       }
+      .floating-cart {
+        bottom: 15px;
+        left: 15px;
+      }
+      .cart-toggle {
+        width: 50px;
+        height: 50px;
+        font-size: 1.3rem;
+      }
     }
     @media (max-width: 480px) {
       body {
@@ -566,55 +583,6 @@ function renderPublicMenuHTML(res, categories, uncategorized, settings, tableNam
       }
       .category-title {
         font-size: 1.5rem;
-      }
-    }
-    /* تحسينات قوية للجوال */
-    @media (max-width: 768px) {
-      .floating-cart {
-        bottom: 15px !important;
-        left: 15px !important;
-        z-index: 10000 !important;
-      }
-      .cart-toggle {
-        width: 55px !important;
-        height: 55px !important;
-        font-size: 1.5rem !important;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.3) !important;
-      }
-      .cart-panel {
-        width: calc(100% - 30px) !important;
-        max-width: 350px !important;
-        left: 15px !important;
-        right: auto !important;
-        bottom: 80px !important;
-        max-height: 60vh !important;
-        background: white !important;
-        border-radius: 15px !important;
-        box-shadow: 0 5px 25px rgba(0,0,0,0.3) !important;
-        padding: 15px !important;
-        z-index: 10001 !important;
-      }
-      .cart-item {
-        flex-direction: row !important;
-        align-items: center !important;
-        gap: 5px !important;
-        font-size: 14px !important;
-      }
-      .cart-item-actions button {
-        width: 35px !important;
-        height: 35px !important;
-        font-size: 1.1rem !important;
-      }
-      .cart-count {
-        width: 22px !important;
-        height: 22px !important;
-        font-size: 12px !important;
-        right: -5px !important;
-        top: -5px !important;
-      }
-      .whatsapp-btn {
-        padding: 12px !important;
-        font-size: 1rem !important;
       }
     }
   `;
@@ -694,7 +662,7 @@ function renderPublicMenuHTML(res, categories, uncategorized, settings, tableNam
       ${tableMessage}
       
       <div class="header-actions">
-        <a href="/about/${res.slug}" class="action-btn">ℹ️ عن المطعم</a>
+        <a href="/about/${res.slug}" class="action-btn" target="_self">ℹ️ عن المطعم</a>
       </div>
       
       <div class="search-container">
@@ -708,7 +676,7 @@ function renderPublicMenuHTML(res, categories, uncategorized, settings, tableNam
 
   <!-- السلة العائمة -->
   <div class="floating-cart">
-    <button class="cart-toggle" id="cartToggleButton">
+    <button class="cart-toggle" onclick="toggleCart()">
       🛒
       <span class="cart-count" id="cartCount">0</span>
     </button>
@@ -728,304 +696,295 @@ function renderPublicMenuHTML(res, categories, uncategorized, settings, tableNam
     </div>
   </div>
 
- <script>
-  // التحقق من توفر localStorage
-  let storageAvailable = true;
-  try {
-    localStorage.setItem('test', 'test');
-    localStorage.removeItem('test');
-  } catch(e) {
-    storageAvailable = false;
-    console.warn('localStorage غير متاح، سيتم استخدام متغير مؤقت');
-  }
-
-  // تهيئة السلة
-  let cart = [];
-  if (storageAvailable) {
+  <script>
+    // التحقق من توفر localStorage
+    let storageAvailable = true;
     try {
-      cart = JSON.parse(localStorage.getItem('cart')) || [];
-    } catch {
+      localStorage.setItem('test', 'test');
+      localStorage.removeItem('test');
+    } catch(e) {
+      storageAvailable = false;
+      console.warn('localStorage غير متاح، سيتم استخدام متغير مؤقت');
+    }
+
+    // تهيئة السلة
+    let cart = [];
+    if (storageAvailable) {
+      try {
+        cart = JSON.parse(localStorage.getItem('cart')) || [];
+      } catch {
+        cart = [];
+      }
+    } else {
       cart = [];
     }
-  } else {
-    cart = [];
-  }
-  
-  let currentItem = null;
+    
+    let currentItem = null;
 
-  console.log('✅ تم تحميل الصفحة، السلة مهيأة');
-  console.log('عدد العناصر في السلة:', cart.length);
-  console.log('زر السلة موجود:', document.querySelector('.cart-toggle') !== null);
-
-  function saveCart() {
-    if (storageAvailable) {
-      localStorage.setItem('cart', JSON.stringify(cart));
+    function saveCart() {
+      if (storageAvailable) {
+        localStorage.setItem('cart', JSON.stringify(cart));
+      }
+      updateCartCount();
+      updateCartPanel();
     }
-    updateCartCount();
-    updateCartPanel();
-  }
 
-  function updateCartCount() {
-    const countEl = document.getElementById('cartCount');
-    if (countEl) {
-      countEl.innerText = cart.reduce((sum, item) => sum + item.quantity, 0);
+    function updateCartCount() {
+      const countEl = document.getElementById('cartCount');
+      if (countEl) {
+        countEl.innerText = cart.reduce((sum, item) => sum + item.quantity, 0);
+      }
     }
-  }
 
-  async function openOptionsModal(id, name, price) {
-    try {
-      const response = await fetch('/api/options/' + id);
-      const options = await response.json();
-      
-      document.getElementById('modalItemName').innerText = name;
-      let optionsHtml = '<h4 style="margin-bottom:10px;">🔘 الخيارات المتاحة:</h4>';
-      
-      if (options.length > 0) {
-        options.forEach(opt => {
-          optionsHtml += \`
-            <div class="option-item">
-              <label style="display:flex; align-items:center; gap:10px;">
-                <input type="checkbox" class="option-checkbox" data-id="\${opt.id}" data-name="\${opt.option_name}" data-price="\${opt.option_price}">
-                <span>\${opt.option_name}</span>
-                \${opt.option_price > 0 ? '<span style="color:green;">(+' + opt.option_price + ' ريال)</span>' : ''}
-              </label>
-            </div>
-          \`;
+    async function openOptionsModal(id, name, price) {
+      try {
+        const response = await fetch('/api/options/' + id);
+        const options = await response.json();
+        
+        document.getElementById('modalItemName').innerText = name;
+        let optionsHtml = '<h4 style="margin-bottom:10px;">🔘 الخيارات المتاحة:</h4>';
+        
+        if (options.length > 0) {
+          options.forEach(opt => {
+            optionsHtml += \`
+              <div class="option-item">
+                <label style="display:flex; align-items:center; gap:10px;">
+                  <input type="checkbox" class="option-checkbox" data-id="\${opt.id}" data-name="\${opt.option_name}" data-price="\${opt.option_price}">
+                  <span>\${opt.option_name}</span>
+                  \${opt.option_price > 0 ? '<span style="color:green;">(+' + opt.option_price + ' ريال)</span>' : ''}
+                </label>
+              </div>
+            \`;
+          });
+        } else {
+          optionsHtml += '<p style="color:#666;">لا توجد خيارات إضافية لهذه الوجبة</p>';
+        }
+        
+        document.getElementById('modalOptions').innerHTML = optionsHtml;
+        document.getElementById('optionsModal').classList.add('show');
+        
+        currentItem = { id, name, basePrice: price };
+      } catch (err) {
+        alert('حدث خطأ أثناء جلب الخيارات');
+      }
+    }
+
+    function closeModal() {
+      document.getElementById('optionsModal').classList.remove('show');
+    }
+
+    function confirmAdd() {
+      const selectedOptions = [];
+      document.querySelectorAll('.option-checkbox:checked').forEach(cb => {
+        selectedOptions.push({
+          id: cb.dataset.id,
+          name: cb.dataset.name,
+          price: parseFloat(cb.dataset.price)
         });
+      });
+      const note = document.getElementById('modalNote').value.trim();
+      
+      addToCart(currentItem.id, currentItem.name, currentItem.basePrice, selectedOptions, note);
+      closeModal();
+    }
+
+    function addToCart(id, name, basePrice, options, note) {
+      const totalPrice = basePrice + options.reduce((sum, opt) => sum + opt.price, 0);
+      const cartItem = {
+        id,
+        name,
+        basePrice,
+        options,
+        note,
+        totalPrice,
+        quantity: 1
+      };
+      
+      const existingIndex = cart.findIndex(item => 
+        item.id === id && 
+        JSON.stringify(item.options) === JSON.stringify(options) && 
+        item.note === note
+      );
+      
+      if (existingIndex >= 0) {
+        cart[existingIndex].quantity += 1;
       } else {
-        optionsHtml += '<p style="color:#666;">لا توجد خيارات إضافية لهذه الوجبة</p>';
+        cart.push(cartItem);
       }
       
-      document.getElementById('modalOptions').innerHTML = optionsHtml;
-      document.getElementById('optionsModal').classList.add('show');
+      saveCart();
+      // إظهار السلة بعد الإضافة
+      toggleCart(true);
+    }
+
+    function updateCartPanel() {
+      const panel = document.getElementById('cartPanel');
+      if (!panel) return;
       
-      currentItem = { id, name, basePrice: price };
-    } catch (err) {
-      alert('حدث خطأ أثناء جلب الخيارات');
-    }
-  }
-
-  function closeModal() {
-    document.getElementById('optionsModal').classList.remove('show');
-  }
-
-  function confirmAdd() {
-    const selectedOptions = [];
-    document.querySelectorAll('.option-checkbox:checked').forEach(cb => {
-      selectedOptions.push({
-        id: cb.dataset.id,
-        name: cb.dataset.name,
-        price: parseFloat(cb.dataset.price)
+      if (cart.length === 0) {
+        panel.innerHTML = '<p style="text-align:center;">السلة فارغة</p>';
+        return;
+      }
+      
+      let total = 0;
+      let html = '';
+      
+      cart.forEach((item, index) => {
+        total += item.totalPrice * item.quantity;
+        html += \`
+          <div class="cart-item">
+            <div class="cart-item-details">
+              <div class="cart-item-name">\${item.name} x\${item.quantity}</div>
+              \${item.options.length > 0 ? '<div class="cart-item-options">' + item.options.map(o => o.name).join(', ') + '</div>' : ''}
+              \${item.note ? '<div class="cart-item-options">📝 ' + item.note + '</div>' : ''}
+              <div>\${item.totalPrice * item.quantity} ريال</div>
+            </div>
+            <div class="cart-item-actions">
+              <button onclick="updateQuantity(\${index}, -1)">-</button>
+              <button onclick="updateQuantity(\${index}, 1)">+</button>
+              <button onclick="removeItem(\${index})">🗑️</button>
+            </div>
+          </div>
+        \`;
       });
-    });
-    const note = document.getElementById('modalNote').value.trim();
-    
-    addToCart(currentItem.id, currentItem.name, currentItem.basePrice, selectedOptions, note);
-    closeModal();
-  }
-
-  function addToCart(id, name, basePrice, options, note) {
-    const totalPrice = basePrice + options.reduce((sum, opt) => sum + opt.price, 0);
-    const cartItem = {
-      id,
-      name,
-      basePrice,
-      options,
-      note,
-      totalPrice,
-      quantity: 1
-    };
-    
-    const existingIndex = cart.findIndex(item => 
-      item.id === id && 
-      JSON.stringify(item.options) === JSON.stringify(options) && 
-      item.note === note
-    );
-    
-    if (existingIndex >= 0) {
-      cart[existingIndex].quantity += 1;
-    } else {
-      cart.push(cartItem);
+      
+      html += \`<div class="cart-total">المجموع: \${total} ريال</div>\`;
+      html += \`<button class="whatsapp-btn" onclick="sendOrder()">📱 إرسال الطلب عبر واتساب</button>\`;
+      html += \`<button onclick="clearCart()" style="width:100%; padding:10px; margin-top:10px; background:#dc3545; color:white; border:none; border-radius:10px;">تفريغ السلة</button>\`;
+      
+      panel.innerHTML = html;
     }
-    
-    saveCart();
-    // إظهار السلة بعد الإضافة مباشرة
-    showCart();
-  }
 
-  function updateCartPanel() {
-    const panel = document.getElementById('cartPanel');
-    if (!panel) return;
-    
-    if (cart.length === 0) {
-      panel.innerHTML = '<p style="text-align:center;">السلة فارغة</p>';
-      return;
+    function toggleCart(forceShow) {
+      const panel = document.getElementById('cartPanel');
+      if (!panel) return;
+      
+      if (forceShow === true) {
+        panel.classList.add('show');
+      } else {
+        panel.classList.toggle('show');
+      }
+      
+      if (cart.length === 0) {
+        panel.classList.remove('show');
+      }
     }
-    
-    let total = 0;
-    let html = '';
-    
-    cart.forEach((item, index) => {
-      total += item.totalPrice * item.quantity;
-      html += \`
-        <div class="cart-item">
-          <div class="cart-item-details">
-            <div class="cart-item-name">\${item.name} x\${item.quantity}</div>
-            \${item.options.length > 0 ? '<div class="cart-item-options">' + item.options.map(o => o.name).join(', ') + '</div>' : ''}
-            \${item.note ? '<div class="cart-item-options">📝 ' + item.note + '</div>' : ''}
-            <div>\${item.totalPrice * item.quantity} ريال</div>
-          </div>
-          <div class="cart-item-actions">
-            <button onclick="updateQuantity(\${index}, -1)">-</button>
-            <button onclick="updateQuantity(\${index}, 1)">+</button>
-            <button onclick="removeItem(\${index})">🗑️</button>
-          </div>
-        </div>
-      \`;
-    });
-    
-    html += \`<div class="cart-total">المجموع: \${total} ريال</div>\`;
-    html += \`<button class="whatsapp-btn" onclick="sendOrder()">📱 إرسال الطلب عبر واتساب</button>\`;
-    html += \`<button onclick="clearCart()" style="width:100%; padding:10px; margin-top:10px; background:#dc3545; color:white; border:none; border-radius:10px;">تفريغ السلة</button>\`;
-    
-    panel.innerHTML = html;
-  }
 
-  function showCart() {
-    const panel = document.getElementById('cartPanel');
-    if (panel) {
-      panel.classList.add('show');
+    function updateQuantity(index, delta) {
+      cart[index].quantity += delta;
+      if (cart[index].quantity <= 0) {
+        cart.splice(index, 1);
+      }
+      saveCart();
     }
-  }
 
-  function hideCart() {
-    const panel = document.getElementById('cartPanel');
-    if (panel) {
-      panel.classList.remove('show');
-    }
-  }
-
-  function toggleCart() {
-    const panel = document.getElementById('cartPanel');
-    if (!panel) return;
-    
-    if (cart.length === 0) {
-      panel.classList.remove('show');
-      return;
-    }
-    
-    panel.classList.toggle('show');
-  }
-
-  function updateQuantity(index, delta) {
-    cart[index].quantity += delta;
-    if (cart[index].quantity <= 0) {
+    function removeItem(index) {
       cart.splice(index, 1);
+      saveCart();
     }
-    saveCart();
-  }
 
-  function removeItem(index) {
-    cart.splice(index, 1);
-    saveCart();
-  }
+    function clearCart() {
+      cart = [];
+      saveCart();
+    }
 
-  function clearCart() {
-    cart = [];
-    saveCart();
-    hideCart();
-  }
+    function sendOrder() {
+      if (cart.length === 0) return alert('السلة فارغة');
+      const phone = "${info.whatsapp || ''}".replace(/\\D/g, '');
+      if (!phone) return alert('رقم واتساب المطعم غير مضبوط');
 
-  function sendOrder() {
-    if (cart.length === 0) return alert('السلة فارغة');
-    const phone = "${info.whatsapp || ''}".replace(/\\D/g, '');
-    if (!phone) return alert('رقم واتساب المطعم غير مضبوط');
-
-    let orderText = 'طلب جديد من المنيو';
-    if ("${tableName}") orderText += ' (' + "${tableName}" + ')';
-    orderText += ':\\n';
-    let total = 0;
-    
-    cart.forEach(item => {
-      orderText += \`\\n🍽️ \${item.name} x\${item.quantity}\`;
-      if (item.options.length > 0) {
-        orderText += ' (' + item.options.map(o => o.name).join(', ') + ')';
-      }
-      if (item.note) {
-        orderText += \`\\n   📝 ملاحظة: \${item.note}\`;
-      }
-      orderText += \`\\n   💰 \${item.totalPrice * item.quantity} ريال\`;
-      total += item.totalPrice * item.quantity;
-    });
-    
-    orderText += \`\\n\\n💰 الإجمالي: \${total} ريال\`;
-    window.open(\`https://wa.me/\${phone}?text=\${encodeURIComponent(orderText)}\`, '_blank');
-  }
-
-  // ربط الأحداث يدوياً لضمان العمل على الجوال
-  function bindEvents() {
-    // ربط زر السلة
-    const cartToggle = document.getElementById('cartToggleButton');
-    if (cartToggle) {
-      cartToggle.removeEventListener('click', toggleCart);
-      cartToggle.removeEventListener('touchstart', toggleCart);
-      cartToggle.addEventListener('click', function(e) {
-        e.preventDefault();
-        toggleCart();
+      let orderText = 'طلب جديد من المنيو';
+      if ("${tableName}") orderText += ' (' + "${tableName}" + ')';
+      orderText += ':\\n';
+      let total = 0;
+      
+      cart.forEach(item => {
+        orderText += \`\\n🍽️ \${item.name} x\${item.quantity}\`;
+        if (item.options.length > 0) {
+          orderText += ' (' + item.options.map(o => o.name).join(', ') + ')';
+        }
+        if (item.note) {
+          orderText += \`\\n   📝 ملاحظة: \${item.note}\`;
+        }
+        orderText += \`\\n   💰 \${item.totalPrice * item.quantity} ريال\`;
+        total += item.totalPrice * item.quantity;
       });
-      cartToggle.addEventListener('touchstart', function(e) {
-        e.preventDefault();
-        toggleCart();
+      
+      orderText += \`\\n\\n💰 الإجمالي: \${total} ريال\`;
+      window.open(\`https://wa.me/\${phone}?text=\${encodeURIComponent(orderText)}\`, '_blank');
+    }
+
+    // ربط الأحداث بعد تحميل الصفحة
+    document.addEventListener('DOMContentLoaded', function() {
+      console.log('DOM جاهز، جاري ربط الأحداث');
+      
+      // ربط زر السلة
+      const cartToggle = document.querySelector('.cart-toggle');
+      if (cartToggle) {
+        cartToggle.addEventListener('click', function(e) {
+          e.preventDefault();
+          toggleCart();
+        });
+        // دعم اللمس للجوال
+        cartToggle.addEventListener('touchstart', function(e) {
+          e.preventDefault();
+          toggleCart();
+        });
+      }
+      
+      // ربط أزرار الإضافة
+      document.querySelectorAll('.add-to-cart-btn').forEach(btn => {
+        btn.addEventListener('click', function(e) {
+          e.preventDefault();
+          e.stopPropagation();
+          const id = this.dataset.id;
+          const name = this.dataset.name;
+          const price = parseFloat(this.dataset.price);
+          openOptionsModal(id, name, price);
+        });
+        btn.addEventListener('touchstart', function(e) {
+          e.preventDefault();
+          e.stopPropagation();
+          const id = this.dataset.id;
+          const name = this.dataset.name;
+          const price = parseFloat(this.dataset.price);
+          openOptionsModal(id, name, price);
+        });
+      });
+      
+      // تحديث السلة
+      updateCartCount();
+      updateCartPanel();
+    });
+
+    // إعادة الربط بعد البحث
+    const searchInput = document.getElementById('searchInput');
+    if (searchInput) {
+      searchInput.addEventListener('input', function() {
+        setTimeout(function() {
+          document.querySelectorAll('.add-to-cart-btn').forEach(btn => {
+            btn.addEventListener('click', function(e) {
+              e.preventDefault();
+              e.stopPropagation();
+              const id = this.dataset.id;
+              const name = this.dataset.name;
+              const price = parseFloat(this.dataset.price);
+              openOptionsModal(id, name, price);
+            });
+          });
+        }, 100);
       });
     }
-    
-    // ربط أزرار الإضافة
-    document.querySelectorAll('.add-to-cart-btn').forEach(btn => {
-      btn.removeEventListener('click', handleAddClick);
-      btn.removeEventListener('touchstart', handleAddClick);
-      btn.addEventListener('click', handleAddClick);
-      btn.addEventListener('touchstart', handleAddClick);
+
+    // إغلاق السلة عند النقر خارجها
+    document.addEventListener('click', function(e) {
+      const panel = document.getElementById('cartPanel');
+      const toggle = document.querySelector('.cart-toggle');
+      if (panel && toggle && !panel.contains(e.target) && !toggle.contains(e.target)) {
+        panel.classList.remove('show');
+      }
     });
-  }
-
-  function handleAddClick(e) {
-    e.preventDefault();
-    e.stopPropagation();
-    const btn = e.currentTarget;
-    const id = btn.dataset.id;
-    const name = btn.dataset.name;
-    const price = parseFloat(btn.dataset.price);
-    openOptionsModal(id, name, price);
-  }
-
-  // تشغيل الربط بعد تحميل الصفحة وبعد أي تغيير في DOM
-  document.addEventListener('DOMContentLoaded', function() {
-    bindEvents();
-    updateCartCount();
-    updateCartPanel();
-  });
-
-  // إعادة الربط عند إجراء بحث (لأن العناصر قد تتغير)
-  const searchInput = document.getElementById('searchInput');
-  if (searchInput) {
-    searchInput.addEventListener('input', function() {
-      setTimeout(bindEvents, 100);
-    });
-  }
-
-  // إغلاق السلة عند النقر خارجها (لتحسين تجربة الجوال)
-  document.addEventListener('click', function(e) {
-    const panel = document.getElementById('cartPanel');
-    const toggle = document.getElementById('cartToggleButton');
-    if (panel && toggle && !panel.contains(e.target) && !toggle.contains(e.target)) {
-      panel.classList.remove('show');
-    }
-  });
-
-  // تهيئة أولية
-  updateCartCount();
-  updateCartPanel();
-</script>
+  </script>
 </body>
 </html>`;
 }
