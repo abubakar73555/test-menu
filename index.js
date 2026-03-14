@@ -1,7 +1,7 @@
 // ==========================================
 // 1. الإعدادات العامة
 // ==========================================
-const MASTER_PASSWORD = "admin123"; // يُفضل نقله إلى متغيرات البيئة لاحقاً
+const MASTER_PASSWORD = env.MASTER_PASSWORD || "admin123"; // استخدام متغير البيئة مع fallback
 
 export default {
   async fetch(request, env) {
@@ -14,13 +14,11 @@ export default {
       if (pathname === "/" || pathname === "") return handleLoginRoute(request, env);
       if (parts[0] === "admin" && parts[1] === "master") return handleMasterRoute(request, env);
       
-      // المسارات الجديدة (يجب أن تأتي قبل المسار العام للمطعم)
       if (parts[0] === "admin" && parts[1] && parts[2] === "categories") 
         return handleCategoriesRoute(request, env, parts[1]);
       if (parts[0] === "admin" && parts[1] && parts[2] === "settings") 
         return handleSettingsRoute(request, env, parts[1]);
       
-      // المسار العام للمطعم
       if (parts[0] === "admin" && parts[1]) 
         return handleRestaurantRoute(request, env, parts[1], url.origin);
       
@@ -32,7 +30,11 @@ export default {
 
       return new Response("404 Not Found", { status: 404 });
     } catch (e) {
-      return new Response("خطأ في النظام: " + e.message, { status: 500 });
+      // عرض الخطأ بشكل مفصل للتشخيص
+      return new Response(JSON.stringify({ error: e.message, stack: e.stack }), {
+        status: 500,
+        headers: { "Content-Type": "application/json" }
+      });
     }
   }
 };
@@ -92,10 +94,8 @@ async function getFilteredRestaurants(env, url) {
 // 3. رفع الصور إلى R2
 // ==========================================
 async function handleImageUpload(request, env) {
-  // التحقق من الصلاحية (يجب أن يكون الماستر أو صاحب مطعم)
   const cookie = request.headers.get("Cookie") || "";
   const isMaster = cookie.includes("auth_role=master");
-  // نستخرج slug من الكوكي إذا كان صاحب مطعم
   let restaurantSlug = null;
   const match = cookie.match(/auth_role=res_([^;]+)/);
   if (match) restaurantSlug = match[1];
@@ -104,39 +104,31 @@ async function handleImageUpload(request, env) {
     return new Response("Unauthorized", { status: 401 });
   }
 
-  // نحدد restaurant_id
   let restaurantId;
   if (isMaster) {
-    // الماستر يمكنه رفع صور لأي مطعم (نمرر restaurant_id في الطلب)
     const formData = await request.formData();
     restaurantId = formData.get("restaurant_id");
   } else {
-    // صاحب المطعم: نبحث عن معرف المطعم من slug
     const res = await env.DB.prepare("SELECT id FROM restaurants WHERE slug = ?").bind(restaurantSlug).first();
     if (!res) return new Response("Restaurant not found", { status: 404 });
     restaurantId = res.id;
   }
 
-  // معالجة رفع الصورة
   const formData = await request.formData();
   const file = formData.get("image");
   if (!file) return new Response("No image uploaded", { status: 400 });
 
-  // قراءة محتوى الملف
   const bytes = await file.arrayBuffer();
   const buffer = new Uint8Array(bytes);
 
-  // إنشاء اسم فريد للملف
   const fileName = `${restaurantId}/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
 
-  // رفع إلى R2
   await env.R2.put(fileName, buffer, {
     httpMetadata: { contentType: file.type }
   });
 
-  // إنشاء الرابط العام (يجب استبدال <your-account-hash> بالرابط الصحيح لحسابك)
-  // يمكنك أيضاً استخدام signed URL إذا كان bucket خاصاً
-  const publicUrl = `https://pub-<your-account-hash>.r2.dev/${fileName}`; // استبدل هذا الرابط
+  // استبدل <your-account-hash> بالرابط الصحيح لحسابك
+  const publicUrl = `https://pub-<your-account-hash>.r2.dev/${fileName}`; 
 
   return new Response(JSON.stringify({ url: publicUrl }), {
     headers: { "Content-Type": "application/json" }
@@ -218,6 +210,7 @@ async function handleMasterRoute(request, env) {
     return Response.redirect(new URL("/", request.url));
 
   const url = new URL(request.url);
+  const searchParams = url.searchParams; // ✅ تمرير searchParams إلى دالة العرض
 
   if (request.method === "POST") {
     const data = await request.formData();
@@ -228,7 +221,7 @@ async function handleMasterRoute(request, env) {
       const existing = await env.DB.prepare("SELECT id FROM restaurants WHERE slug = ?").bind(slug).first();
       if (existing) {
         const { restaurants, ...stats } = await getFilteredRestaurants(env, url);
-        return new Response(renderMasterHTML(restaurants, stats, "❌ Slug موجود مسبقاً"), { 
+        return new Response(renderMasterHTML(restaurants, stats, searchParams, "❌ Slug موجود مسبقاً"), { 
           headers: { "Content-Type": "text/html; charset=utf-8" } 
         });
       }
@@ -236,7 +229,6 @@ async function handleMasterRoute(request, env) {
         "INSERT INTO restaurants (res_name, slug, admin_password, created_at, expires_at) VALUES (?, ?, ?, ?, ?)"
       ).bind(data.get("res_name"), slug, data.get("pass"), data.get("created"), data.get("expires")).run();
       
-      // إضافة الإعدادات الافتراضية للمطعم الجديد
       const newRes = await env.DB.prepare("SELECT id FROM restaurants WHERE slug = ?").bind(slug).first();
       await env.DB.prepare(
         "INSERT INTO restaurant_settings (restaurant_id, theme_name) VALUES (?, ?)"
@@ -261,12 +253,13 @@ async function handleMasterRoute(request, env) {
   }
 
   const { restaurants, ...stats } = await getFilteredRestaurants(env, url);
-  return new Response(renderMasterHTML(restaurants, stats), { 
+  return new Response(renderMasterHTML(restaurants, stats, searchParams), { 
     headers: { "Content-Type": "text/html; charset=utf-8" } 
   });
 }
 
-function renderMasterHTML(restaurants, stats, errorMsg = "") {
+// ✅ تعديل الدالة لاستقبال searchParams بدلاً من استخدام globalThis.location
+function renderMasterHTML(restaurants, stats, searchParams, errorMsg = "") {
   const today = new Date().toISOString().split('T')[0];
   const expiredCount = restaurants.filter(r => r.expires_at < today).length;
   const nearExpiryCount = restaurants.filter(r => 
@@ -297,8 +290,9 @@ function renderMasterHTML(restaurants, stats, errorMsg = "") {
     </tr>`;
   }).join('');
 
-  const searchParam = new URLSearchParams(globalThis.location?.search || "").get("search") || "";
-  const statusParam = new URLSearchParams(globalThis.location?.search || "").get("status") || "all";
+  // ✅ استخدام searchParams بدلاً من globalThis.location
+  const searchParam = searchParams?.get("search") || "";
+  const statusParam = searchParams?.get("status") || "all";
 
   return `<!DOCTYPE html>
 <html dir="rtl">
@@ -544,12 +538,10 @@ async function handleRestaurantRoute(request, env, slug, origin) {
   const res = await env.DB.prepare("SELECT * FROM restaurants WHERE slug = ?").bind(slug).first();
   if (!res) return new Response("المطعم غير موجود", { status: 404 });
 
-  // جلب الفئات لهذا المطعم
   const { results: categories } = await env.DB.prepare(
     "SELECT * FROM categories WHERE restaurant_id = ? ORDER BY sort_order, name"
   ).bind(res.id).all();
 
-  // معالجة POST
   if (request.method === "POST") {
     const data = await request.formData();
     const action = data.get("action");
@@ -586,7 +578,6 @@ async function handleRestaurantRoute(request, env, slug, origin) {
     return Response.redirect(new URL(`/admin/${slug}`, request.url));
   }
 
-  // جلب جميع الوجبات مع معلومات الفئة
   const { results: items } = await env.DB.prepare(`
     SELECT items.*, categories.name as category_name 
     FROM items 
@@ -595,7 +586,6 @@ async function handleRestaurantRoute(request, env, slug, origin) {
     ORDER BY categories.sort_order, categories.name, items.name
   `).bind(res.id).all();
 
-  // جلب إعدادات المطعم
   const settings = await env.DB.prepare(
     "SELECT * FROM restaurant_settings WHERE restaurant_id = ?"
   ).bind(res.id).first() || { theme_name: 'default', primary_color: '#007bff', secondary_color: '#6c757d', font_family: 'Tahoma', logo_url: '' };
@@ -877,12 +867,10 @@ async function handlePublicMenuRoute(env, slug) {
   const res = await env.DB.prepare("SELECT * FROM restaurants WHERE slug = ?").bind(slug).first();
   if (!res) return new Response("المطعم غير موجود", { status: 404 });
 
-  // جلب الإعدادات
   const settings = await env.DB.prepare("SELECT * FROM restaurant_settings WHERE restaurant_id = ?").bind(res.id).first() || {
     theme_name: 'default', primary_color: '#007bff', secondary_color: '#6c757d', font_family: 'Tahoma', logo_url: ''
   };
 
-  // جلب الفئات مع الوجبات التابعة
   const { results: categories } = await env.DB.prepare(`
     SELECT c.*, 
            (SELECT json_group_array(json_object('id', i.id, 'name', i.name, 'price', i.price, 'image_url', i.image_url))
@@ -892,7 +880,6 @@ async function handlePublicMenuRoute(env, slug) {
     ORDER BY c.sort_order, c.name
   `).bind(res.id).all();
 
-  // جلب الوجبات التي ليس لها فئة
   const { results: uncategorized } = await env.DB.prepare(`
     SELECT * FROM items WHERE restaurant_id = ? AND category_id IS NULL
   `).bind(res.id).all();
