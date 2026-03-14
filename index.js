@@ -114,11 +114,24 @@ async function handleImageUpload(request, env) {
     });
   }
 
+  // قراءة بيانات النموذج مرة واحدة فقط
+  let formData;
+  try {
+    formData = await request.formData();
+  } catch (e) {
+    return new Response(JSON.stringify({ 
+      error: "❌ فشل قراءة بيانات النموذج: " + e.message,
+      stack: e.stack 
+    }), {
+      status: 400,
+      headers: { "Content-Type": "application/json" }
+    });
+  }
+
   // الحصول على معرف المطعم
   let restaurantId;
   try {
     if (isMaster) {
-      const formData = await request.formData();
       restaurantId = formData.get("restaurant_id");
     } else {
       const res = await env.DB.prepare("SELECT id FROM restaurants WHERE slug = ?").bind(restaurantSlug).first();
@@ -134,21 +147,6 @@ async function handleImageUpload(request, env) {
       error: "❌ خطأ في قاعدة البيانات: " + dbError.message 
     }), {
       status: 500,
-      headers: { "Content-Type": "application/json" }
-    });
-  }
-
-  // استخراج الملف من الطلب مع تفاصيل الخطأ
-  let formData;
-  try {
-    formData = await request.formData();
-  } catch (e) {
-    // 🟢 تم تعديل رسالة الخطأ لإظهار التفاصيل
-    return new Response(JSON.stringify({ 
-      error: "❌ فشل قراءة بيانات النموذج: " + e.message,
-      stack: e.stack 
-    }), {
-      status: 400,
       headers: { "Content-Type": "application/json" }
     });
   }
@@ -227,7 +225,6 @@ async function handleImageUpload(request, env) {
     headers: { "Content-Type": "application/json" }
   });
 }
-
 // ==========================================
 // 4. صفحة تسجيل الدخول
 // ==========================================
