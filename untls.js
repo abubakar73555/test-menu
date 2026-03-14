@@ -2,6 +2,7 @@
 // دوال مساعدة عامة
 // ==========================================
 
+
 // تسجيل النشاطات
 export async function logActivity(env, restaurantId, action, details) {
   await env.DB.prepare(
