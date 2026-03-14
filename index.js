@@ -225,8 +225,9 @@ async function handleImageUpload(request, env) {
     headers: { "Content-Type": "application/json" }
   });
 }
+
 // ==========================================
-// 4. صفحة تسجيل الدخول
+// 4. صفحة تسجيل الدخول (مُحسّنة للجوال)
 // ==========================================
 async function handleLoginRoute(request, env) {
   const MASTER_PASSWORD = env.MASTER_PASSWORD || "admin123";
@@ -270,13 +271,20 @@ async function handleLoginRoute(request, env) {
 function renderLoginHTML(err = "") {
   return `<!DOCTYPE html>
 <html dir="rtl">
-<head><meta charset="UTF-8"><title>تسجيل الدخول</title>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>تسجيل الدخول</title>
 <style>
-  body { font-family:Tahoma; background:#f4f7f6; display:flex; justify-content:center; align-items:center; height:100vh; }
-  .card { background:white; padding:30px; border-radius:15px; box-shadow:0 5px 15px rgba(0,0,0,0.1); width:300px; text-align:center; }
-  input, button { width:100%; margin:10px 0; padding:10px; border:1px solid #ddd; border-radius:5px; }
-  button { background:#007bff; color:white; border:none; cursor:pointer; }
-  .error { color:red; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Tahoma, Arial, sans-serif; background: #f4f7f6; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 20px; }
+  .card { background: white; padding: 30px 25px; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); width: 100%; max-width: 350px; text-align: center; }
+  h2 { margin-bottom: 20px; color: #333; }
+  input, button { width: 100%; margin: 10px 0; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; }
+  button { background: #007bff; color: white; border: none; cursor: pointer; font-weight: bold; transition: background 0.3s; }
+  button:hover { background: #0056b3; }
+  .error { color: red; margin-bottom: 15px; font-size: 14px; }
+  @media (max-width: 480px) {
+    .card { padding: 20px 15px; }
+    h2 { font-size: 1.5rem; }
+  }
 </style>
 </head>
 <body>
@@ -294,7 +302,7 @@ function renderLoginHTML(err = "") {
 }
 
 // ==========================================
-// 5. لوحة تحكم الماستر
+// 5. لوحة تحكم الماستر (مُحسّنة للجوال)
 // ==========================================
 async function handleMasterRoute(request, env) {
   const cookie = request.headers.get("Cookie") || "";
@@ -367,16 +375,18 @@ function renderMasterHTML(restaurants, stats, searchParams, errorMsg = "") {
       <td style="padding:10px; border-bottom:1px solid #eee;">${r.expires_at}</td>
       <td style="padding:10px; border-bottom:1px solid #eee;">${r.last_activity || ''}</td>
       <td style="padding:10px; border-bottom:1px solid #eee;">
-        <a href="/admin/${r.slug}" style="margin-left:5px;">🔍 إدارة</a>
-        <a href="/admin/${r.slug}/categories" style="margin-left:5px;">📁 الفئات</a>
-        <a href="/admin/${r.slug}/settings" style="margin-left:5px;">⚙️ تخصيص</a>
-        <button onclick="openEditModal(${r.id}, '${r.res_name.replace(/'/g, "\\'")}', '${r.slug}', '${r.admin_password}', '${r.expires_at}')" 
-          style="background:orange; color:white; border:none; padding:5px 10px; border-radius:3px; cursor:pointer;">✏️ تعديل</button>
-        <form method="POST" style="display:inline;" onsubmit="return confirm('هل أنت متأكد من الحذف؟');">
-          <input type="hidden" name="action" value="delete">
-          <input type="hidden" name="id" value="${r.id}">
-          <button style="background:red; color:white; border:none; padding:5px 10px; border-radius:3px; cursor:pointer;">🗑️ حذف</button>
-        </form>
+        <div style="display:flex; flex-wrap:wrap; gap:5px; justify-content:center;">
+          <a href="/admin/${r.slug}" style="background:#007bff; color:white; padding:4px 8px; border-radius:3px; text-decoration:none; font-size:0.9rem;">إدارة</a>
+          <a href="/admin/${r.slug}/categories" style="background:#28a745; color:white; padding:4px 8px; border-radius:3px; text-decoration:none; font-size:0.9rem;">الفئات</a>
+          <a href="/admin/${r.slug}/settings" style="background:#17a2b8; color:white; padding:4px 8px; border-radius:3px; text-decoration:none; font-size:0.9rem;">تخصيص</a>
+          <button onclick="openEditModal(${r.id}, '${r.res_name.replace(/'/g, "\\'")}', '${r.slug}', '${r.admin_password}', '${r.expires_at}')" 
+            style="background:orange; color:white; border:none; padding:4px 8px; border-radius:3px; cursor:pointer; font-size:0.9rem;">تعديل</button>
+          <form method="POST" style="display:inline;" onsubmit="return confirm('هل أنت متأكد من الحذف؟');">
+            <input type="hidden" name="action" value="delete">
+            <input type="hidden" name="id" value="${r.id}">
+            <button style="background:red; color:white; border:none; padding:4px 8px; border-radius:3px; cursor:pointer; font-size:0.9rem;">حذف</button>
+          </form>
+        </div>
       </td>
     </tr>`;
   }).join('');
@@ -391,23 +401,46 @@ function renderMasterHTML(restaurants, stats, searchParams, errorMsg = "") {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>لوحة الماستر</title>
   <style>
-    body { font-family:Tahoma; background:#f4f7f6; padding:20px; margin:0; }
-    .container { max-width:1200px; margin:auto; }
-    .stats { display:flex; gap:20px; margin-bottom:20px; flex-wrap:wrap; }
-    .stat-card { background:white; padding:20px; border-radius:10px; box-shadow:0 2px 5px rgba(0,0,0,0.1); flex:1; min-width:150px; text-align:center; }
-    .stat-card h3 { margin:0 0 10px; color:#555; }
-    .stat-card .number { font-size:28px; font-weight:bold; color:#007bff; }
-    .card { background:white; padding:20px; border-radius:10px; box-shadow:0 2px 10px rgba(0,0,0,0.1); margin-bottom:20px; }
-    .filters { display:flex; gap:10px; margin-bottom:20px; flex-wrap:wrap; }
-    .filters input, .filters select, .filters button { padding:8px 12px; border:1px solid #ddd; border-radius:5px; }
-    table { width:100%; border-collapse:collapse; text-align:right; }
-    th { background:#f0f0f0; padding:10px; }
-    .modal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); justify-content:center; align-items:center; }
-    .modal-content { background:white; padding:20px; border-radius:10px; width:400px; max-width:90%; }
-    .error { color:red; margin-bottom:10px; }
-    .alert { padding:10px; border-radius:5px; margin-bottom:20px; }
-    .alert-danger { background:#f8d7da; color:#721c24; }
-    .alert-warning { background:#fff3cd; color:#856404; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Tahoma, Arial, sans-serif; background: #f4f7f6; padding: 15px; }
+    .container { max-width: 1200px; margin: auto; }
+    h1 { font-size: 1.8rem; margin-bottom: 20px; color: #333; text-align: center; }
+    .stats { display: flex; gap: 15px; margin-bottom: 20px; flex-wrap: wrap; }
+    .stat-card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); flex: 1 1 180px; text-align: center; min-width: 140px; }
+    .stat-card h3 { margin: 0 0 10px; color: #555; font-size: 1rem; }
+    .stat-card .number { font-size: 2rem; font-weight: bold; color: #007bff; }
+    .card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); margin-bottom: 20px; }
+    .filters { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+    .filters input, .filters select, .filters button { padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 1rem; }
+    .filters input { flex: 2; min-width: 200px; }
+    .filters select { flex: 1; min-width: 120px; }
+    table { width: 100%; border-collapse: collapse; text-align: right; }
+    th { background: #f0f0f0; padding: 12px; font-size: 0.95rem; }
+    td { padding: 12px; border-bottom: 1px solid #eee; }
+    .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 1000; }
+    .modal-content { background: white; padding: 25px; border-radius: 10px; width: 90%; max-width: 450px; max-height: 90vh; overflow-y: auto; }
+    .modal-content h3 { margin-bottom: 20px; }
+    .modal-content input { width: 100%; padding: 10px; margin: 8px 0; border: 1px solid #ddd; border-radius: 5px; }
+    .modal-content button { padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; }
+    .error { color: red; margin-bottom: 10px; }
+    .alert { padding: 12px; border-radius: 5px; margin-bottom: 20px; }
+    .alert-danger { background: #f8d7da; color: #721c24; }
+    .alert-warning { background: #fff3cd; color: #856404; }
+    @media (max-width: 768px) {
+      body { padding: 10px; }
+      h1 { font-size: 1.5rem; }
+      .stats .stat-card { flex: 1 1 calc(50% - 10px); }
+      table, thead, tbody, th, td, tr { display: block; }
+      thead tr { position: absolute; top: -9999px; left: -9999px; }
+      tr { margin-bottom: 15px; border: 1px solid #ddd; border-radius: 8px; overflow: hidden; }
+      td { display: flex; justify-content: space-between; align-items: center; padding: 10px; text-align: right; border-bottom: 1px solid #eee; }
+      td:last-child { border-bottom: none; }
+      td:before { content: attr(data-label); font-weight: bold; margin-left: 10px; color: #555; width: 40%; }
+    }
+    @media (max-width: 480px) {
+      .stats .stat-card { flex: 1 1 100%; }
+      .filters input, .filters select, .filters button { width: 100%; }
+    }
   </style>
 </head>
 <body>
@@ -440,13 +473,13 @@ function renderMasterHTML(restaurants, stats, searchParams, errorMsg = "") {
 
     <div class="filters">
       <form method="GET" style="display:flex; gap:10px; width:100%; flex-wrap:wrap;">
-        <input type="text" name="search" placeholder="بحث باسم المطعم أو slug" value="${searchParam}" style="flex:2;">
-        <select name="status" style="flex:1;">
+        <input type="text" name="search" placeholder="بحث باسم المطعم أو slug" value="${searchParam}">
+        <select name="status">
           <option value="all" ${statusParam==='all'? 'selected':''}>جميع المطاعم</option>
           <option value="active" ${statusParam==='active'? 'selected':''}>النشطة فقط</option>
           <option value="expired" ${statusParam==='expired'? 'selected':''}>المنتهية فقط</option>
         </select>
-        <button type="submit" style="background:#007bff; color:white; border:none; padding:8px 20px; border-radius:5px;">تطبيق</button>
+        <button type="submit" style="background:#007bff; color:white; border:none; padding:10px 20px; border-radius:5px;">تطبيق</button>
       </form>
     </div>
 
@@ -467,13 +500,13 @@ function renderMasterHTML(restaurants, stats, searchParams, errorMsg = "") {
         <form method="POST" id="editForm">
           <input type="hidden" name="action" value="edit">
           <input type="hidden" name="id" id="editId">
-          <div><label>اسم المطعم:</label><br><input type="text" name="res_name" id="editResName" required style="width:100%; padding:8px;"></div>
-          <div><label>الرابط (slug):</label><br><input type="text" name="slug" id="editSlug" required style="width:100%; padding:8px;"></div>
-          <div><label>كلمة المرور:</label><br><input type="text" name="pass" id="editPass" required style="width:100%; padding:8px;"></div>
-          <div><label>تاريخ الانتهاء:</label><br><input type="date" name="expires" id="editExpires" required style="width:100%; padding:8px;"></div>
+          <div><label>اسم المطعم:</label><br><input type="text" name="res_name" id="editResName" required></div>
+          <div><label>الرابط (slug):</label><br><input type="text" name="slug" id="editSlug" required></div>
+          <div><label>كلمة المرور:</label><br><input type="text" name="pass" id="editPass" required></div>
+          <div><label>تاريخ الانتهاء:</label><br><input type="date" name="expires" id="editExpires" required></div>
           <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:15px;">
-            <button type="button" onclick="document.getElementById('editModal').style.display='none'" style="background:#6c757d; color:white; border:none; padding:8px 15px; border-radius:5px;">إلغاء</button>
-            <button type="submit" style="background:#007bff; color:white; border:none; padding:8px 15px; border-radius:5px;">حفظ التعديلات</button>
+            <button type="button" onclick="document.getElementById('editModal').style.display='none'" style="background:#6c757d; color:white;">إلغاء</button>
+            <button type="submit" style="background:#007bff; color:white;">حفظ التعديلات</button>
           </div>
         </form>
       </div>
@@ -495,7 +528,7 @@ function renderMasterHTML(restaurants, stats, searchParams, errorMsg = "") {
 }
 
 // ==========================================
-// 6. إدارة الفئات
+// 6. إدارة الفئات (مُحسّنة للجوال)
 // ==========================================
 async function handleCategoriesRoute(request, env, slug) {
   const cookie = request.headers.get("Cookie") || "";
@@ -542,42 +575,62 @@ async function handleCategoriesRoute(request, env, slug) {
 function renderCategoriesHTML(res, categories) {
   const rows = categories.map(c => `
     <tr>
-      <td>${c.name}</td>
-      <td>
-        <button onclick="openEditCatModal(${c.id}, '${c.name.replace(/'/g, "\\'")}')" style="background:orange; color:white; border:none; padding:5px 10px;">تعديل</button>
-        <form method="POST" style="display:inline;" onsubmit="return confirm('سيتم إزالة الفئة من الوجبات المرتبطة. استمر؟');">
-          <input type="hidden" name="action" value="delete">
-          <input type="hidden" name="id" value="${c.id}">
-          <button style="background:red; color:white; border:none; padding:5px 10px;">حذف</button>
-        </form>
+      <td data-label="اسم الفئة">${c.name}</td>
+      <td data-label="الإجراءات">
+        <div style="display:flex; gap:5px; flex-wrap:wrap;">
+          <button onclick="openEditCatModal(${c.id}, '${c.name.replace(/'/g, "\\'")}')" style="background:orange; color:white; border:none; padding:5px 10px; border-radius:3px;">تعديل</button>
+          <form method="POST" style="display:inline;" onsubmit="return confirm('سيتم إزالة الفئة من الوجبات المرتبطة. استمر؟');">
+            <input type="hidden" name="action" value="delete">
+            <input type="hidden" name="id" value="${c.id}">
+            <button style="background:red; color:white; border:none; padding:5px 10px; border-radius:3px;">حذف</button>
+          </form>
+        </div>
       </td>
     </tr>
   `).join('');
 
   return `<!DOCTYPE html>
 <html dir="rtl">
-<head><meta charset="UTF-8"><title>إدارة الفئات - ${res.res_name}</title>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>إدارة الفئات - ${res.res_name}</title>
 <style>
-  body { font-family:Tahoma; background:#f4f7f6; padding:20px; }
-  .container { max-width:600px; margin:auto; background:white; padding:20px; border-radius:10px; }
-  table { width:100%; border-collapse:collapse; }
-  th { background:#f0f0f0; padding:10px; }
-  td { padding:10px; border-bottom:1px solid #eee; }
-  .modal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); justify-content:center; align-items:center; }
-  .modal-content { background:white; padding:20px; border-radius:10px; width:400px; max-width:90%; }
+  * { box-sizing: border-box; }
+  body { font-family: Tahoma, Arial, sans-serif; background: #f4f7f6; padding: 15px; margin:0; }
+  .container { max-width: 600px; margin: auto; background: white; padding: 20px; border-radius: 10px; box-shadow:0 2px 10px rgba(0,0,0,0.1); }
+  h2 { font-size: 1.5rem; margin-bottom: 20px; text-align: center; }
+  form.add-form { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+  form.add-form input { flex: 1; min-width: 200px; padding: 10px; border: 1px solid #ddd; border-radius: 5px; }
+  form.add-form button { padding: 10px 20px; background: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer; }
+  table { width: 100%; border-collapse: collapse; }
+  th { background: #f0f0f0; padding: 12px; text-align: right; }
+  td { padding: 12px; border-bottom: 1px solid #eee; }
+  .modal { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); justify-content:center; align-items:center; z-index:1000; }
+  .modal-content { background: white; padding: 25px; border-radius: 10px; width: 90%; max-width: 400px; }
+  .modal-content input { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ddd; border-radius: 5px; }
+  .modal-content button { padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; }
+  a { text-decoration: none; color: #007bff; }
+  @media (max-width: 600px) {
+    table, thead, tbody, th, td, tr { display: block; }
+    thead tr { position: absolute; top: -9999px; left: -9999px; }
+    tr { margin-bottom: 15px; border: 1px solid #ddd; border-radius: 8px; overflow: hidden; }
+    td { display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #eee; }
+    td:last-child { border-bottom: none; }
+    td:before { content: attr(data-label); font-weight: bold; margin-left: 10px; color: #555; width: 40%; }
+    form.add-form input { width: 100%; }
+    form.add-form button { width: 100%; }
+  }
 </style>
 </head>
 <body>
   <div class="container">
     <h2>📁 إدارة الفئات - ${res.res_name}</h2>
-    <form method="POST" style="display:flex; gap:10px; margin-bottom:20px;">
+    <form class="add-form" method="POST">
       <input type="hidden" name="action" value="add">
-      <input type="text" name="name" placeholder="اسم الفئة" required style="flex:1; padding:8px;">
-      <button type="submit" style="background:#28a745; color:white; border:none; padding:8px 15px;">إضافة فئة</button>
+      <input type="text" name="name" placeholder="اسم الفئة" required>
+      <button type="submit">إضافة فئة</button>
     </form>
     <table>
-      <thead><tr><th>اسم الفئة</th><th>إجراءات</th></tr></thead>
-      <tbody>${rows || '<tr><td colspan="2">لا توجد فئات</td></tr>'}</tbody>
+      <thead><tr><th>اسم الفئة</th><th>الإجراءات</th></tr></thead>
+      <tbody>${rows || '<tr><td colspan="2" style="text-align:center;">لا توجد فئات</td></tr>'}</tbody>
     </table>
     <br>
     <a href="/admin/${res.slug}">🔙 العودة للوحة المطعم</a>
@@ -589,10 +642,10 @@ function renderCategoriesHTML(res, categories) {
       <form method="POST">
         <input type="hidden" name="action" value="edit">
         <input type="hidden" name="id" id="editCatId">
-        <input type="text" name="name" id="editCatName" required style="width:100%; padding:8px;">
-        <div style="display:flex; gap:10px; margin-top:15px;">
-          <button type="button" onclick="document.getElementById('editCatModal').style.display='none'">إلغاء</button>
-          <button type="submit">حفظ</button>
+        <input type="text" name="name" id="editCatName" required>
+        <div style="display:flex; gap:10px; justify-content:flex-end;">
+          <button type="button" onclick="document.getElementById('editCatModal').style.display='none'" style="background:#6c757d; color:white;">إلغاء</button>
+          <button type="submit" style="background:#007bff; color:white;">حفظ</button>
         </div>
       </form>
     </div>
@@ -610,7 +663,7 @@ function renderCategoriesHTML(res, categories) {
 }
 
 // ==========================================
-// 7. لوحة تحكم المطعم
+// 7. لوحة تحكم المطعم (مُحسّنة للجوال)
 // ==========================================
 async function handleRestaurantRoute(request, env, slug, origin) {
   const cookie = request.headers.get("Cookie") || "";
@@ -685,36 +738,48 @@ function renderRestaurantHTML(res, items, categories, settings, origin) {
   const catOptions = categories.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
   
   const itemsList = items.map(i => `
-    <li style="padding:10px; border-bottom:1px solid #eee; display:flex; align-items:center; gap:10px;">
+    <li style="padding:10px; border-bottom:1px solid #eee; display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
       ${i.image_url ? `<img src="${i.image_url}" style="width:50px; height:50px; object-fit:cover; border-radius:5px;">` : ''}
-      <div style="flex:1;">
+      <div style="flex:1; min-width:120px;">
         <strong>${i.name}</strong> - ${i.price} ريال
         ${i.category_name ? `<br><small>فئة: ${i.category_name}</small>` : ''}
       </div>
-      <button onclick="openEditItemModal(${i.id}, '${i.name.replace(/'/g, "\\'")}', ${i.price}, ${i.category_id || 'null'}, '${i.image_url || ''}')" style="background:orange; color:white; border:none; padding:5px 10px;">تعديل</button>
-      <form method="POST" style="margin:0;" onsubmit="return confirm('حذف الوجبة؟');">
-        <input type="hidden" name="action" value="delete">
-        <input type="hidden" name="id" value="${i.id}">
-        <button style="background:red; color:white; border:none; padding:5px 10px;">حذف</button>
-      </form>
+      <div style="display:flex; gap:5px;">
+        <button onclick="openEditItemModal(${i.id}, '${i.name.replace(/'/g, "\\'")}', ${i.price}, ${i.category_id || 'null'}, '${i.image_url || ''}')" style="background:orange; color:white; border:none; padding:5px 10px; border-radius:3px;">تعديل</button>
+        <form method="POST" style="margin:0;" onsubmit="return confirm('حذف الوجبة؟');">
+          <input type="hidden" name="action" value="delete">
+          <input type="hidden" name="id" value="${i.id}">
+          <button style="background:red; color:white; border:none; padding:5px 10px; border-radius:3px;">حذف</button>
+        </form>
+      </div>
     </li>
   `).join('');
 
   return `<!DOCTYPE html>
 <html dir="rtl">
-<head><meta charset="UTF-8"><title>إدارة ${res.res_name}</title>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>إدارة ${res.res_name}</title>
 <style>
-  body { font-family:${settings.font_family}; padding:20px; background:#f8f9fa; }
-  .container { max-width:800px; margin:auto; background:white; padding:20px; border-radius:10px; box-shadow:0 2px 10px rgba(0,0,0,0.1); }
-  .header { display:flex; justify-content:space-between; align-items:center; }
-  .logo-img { max-height:60px; }
-  .qr-img { border:1px solid #ddd; padding:5px; border-radius:5px; }
-  .add-form { background:#f9f9f9; padding:15px; border-radius:8px; margin-bottom:20px; }
-  .add-form input, .add-form select, .add-form button { padding:8px; margin:5px; border:1px solid #ddd; border-radius:5px; }
-  ul { list-style:none; padding:0; }
-  .modal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); justify-content:center; align-items:center; z-index:1000; }
-  .modal-content { background:white; padding:20px; border-radius:10px; width:500px; max-width:90%; max-height:80vh; overflow-y:auto; }
-  .logout-btn { background:#6c757d; color:white; border:none; padding:10px; border-radius:5px; cursor:pointer; width:100%; margin-top:20px; }
+  * { box-sizing: border-box; }
+  body { font-family: ${settings.font_family}, Tahoma, Arial; padding: 15px; background: #f8f9fa; margin:0; }
+  .container { max-width: 800px; margin: auto; background: white; padding: 20px; border-radius: 10px; box-shadow:0 2px 10px rgba(0,0,0,0.1); }
+  .header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; margin-bottom: 15px; }
+  .logo-img { max-height: 50px; }
+  .qr-img { border:1px solid #ddd; padding:5px; border-radius:5px; max-width: 100px; }
+  .add-form { background: #f9f9f9; padding: 15px; border-radius: 8px; margin-bottom: 20px; }
+  .add-form input, .add-form select, .add-form button { padding: 10px; margin: 5px; border:1px solid #ddd; border-radius:5px; width: calc(100% - 10px); }
+  .add-form .flex-row { display: flex; flex-wrap: wrap; gap: 10px; }
+  .add-form .flex-row > * { flex: 1 1 200px; }
+  ul { list-style: none; padding: 0; }
+  .modal { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); justify-content:center; align-items:center; z-index:1000; }
+  .modal-content { background: white; padding: 20px; border-radius: 10px; width: 90%; max-width: 500px; max-height: 80vh; overflow-y: auto; }
+  .modal-content input, .modal-content select { width: 100%; padding: 10px; margin: 5px 0; border: 1px solid #ddd; border-radius: 5px; }
+  .logout-btn { background: #6c757d; color: white; border: none; padding: 12px; border-radius: 5px; cursor: pointer; width: 100%; margin-top: 20px; font-size: 1rem; }
+  a { text-decoration: none; color: #007bff; }
+  @media (max-width: 600px) {
+    .header { flex-direction: column; align-items: start; }
+    .qr-img { align-self: center; }
+    .add-form input, .add-form select, .add-form button { width: 100%; margin: 5px 0; }
+  }
 </style>
 </head>
 <body>
@@ -734,15 +799,17 @@ function renderRestaurantHTML(res, items, categories, settings, origin) {
       <h3>➕ إضافة وجبة جديدة</h3>
       <form method="POST" enctype="multipart/form-data" onsubmit="event.preventDefault(); uploadImageAndSubmit(this);">
         <input type="hidden" name="action" value="add">
-        <input type="text" name="name" placeholder="اسم الوجبة" required>
-        <input type="number" name="price" placeholder="السعر" required>
-        <select name="category_id">
-          <option value="">بدون فئة</option>
-          ${catOptions}
-        </select>
-        <input type="file" name="image" accept="image/*" id="imageInput">
+        <div class="flex-row">
+          <input type="text" name="name" placeholder="اسم الوجبة" required>
+          <input type="number" name="price" placeholder="السعر" required>
+          <select name="category_id">
+            <option value="">بدون فئة</option>
+            ${catOptions}
+          </select>
+          <input type="file" name="image" accept="image/*" id="imageInput">
+        </div>
         <input type="hidden" name="image_url" id="imageUrl">
-        <button type="submit" style="background:#28a745; color:white;">إضافة</button>
+        <button type="submit" style="background:#28a745; color:white; width:100%; padding:12px;">إضافة</button>
       </form>
     </div>
 
@@ -754,15 +821,20 @@ function renderRestaurantHTML(res, items, categories, settings, origin) {
         <form method="POST" enctype="multipart/form-data" onsubmit="event.preventDefault(); updateItem(this);">
           <input type="hidden" name="action" value="edit">
           <input type="hidden" name="id" id="editItemId">
-          <div><label>الاسم:</label><br><input type="text" name="name" id="editItemName" required></div>
-          <div><label>السعر:</label><br><input type="number" name="price" id="editItemPrice" required></div>
-          <div><label>الفئة:</label><br><select name="category_id" id="editItemCategory">${catOptions}</select></div>
-          <div><label>الصورة الحالية:</label><br><img id="editItemImagePreview" style="max-width:100px; max-height:100px;"></div>
-          <div><label>تغيير الصورة:</label><br><input type="file" name="image" accept="image/*" id="editImageInput"></div>
+          <label>الاسم:</label>
+          <input type="text" name="name" id="editItemName" required>
+          <label>السعر:</label>
+          <input type="number" name="price" id="editItemPrice" required>
+          <label>الفئة:</label>
+          <select name="category_id" id="editItemCategory">${catOptions}</select>
+          <label>الصورة الحالية:</label>
+          <img id="editItemImagePreview" style="max-width:100%; max-height:150px; margin:10px 0;">
+          <label>تغيير الصورة:</label>
+          <input type="file" name="image" accept="image/*" id="editImageInput">
           <input type="hidden" name="image_url" id="editImageUrl">
-          <div style="margin-top:15px;">
-            <button type="button" onclick="closeEditModal()">إلغاء</button>
-            <button type="submit">حفظ</button>
+          <div style="display:flex; gap:10px; margin-top:15px;">
+            <button type="button" onclick="closeEditModal()" style="flex:1; background:#6c757d; color:white; padding:10px;">إلغاء</button>
+            <button type="submit" style="flex:1; background:#007bff; color:white; padding:10px;">حفظ</button>
           </div>
         </form>
       </div>
@@ -835,7 +907,7 @@ function renderRestaurantHTML(res, items, categories, settings, origin) {
 }
 
 // ==========================================
-// 8. إعدادات تخصيص المنيو
+// 8. إعدادات تخصيص المنيو (مُحسّنة للجوال)
 // ==========================================
 async function handleSettingsRoute(request, env, slug) {
   const cookie = request.headers.get("Cookie") || "";
@@ -880,14 +952,17 @@ async function handleSettingsRoute(request, env, slug) {
 function renderSettingsHTML(res, settings) {
   return `<!DOCTYPE html>
 <html dir="rtl">
-<head><meta charset="UTF-8"><title>تخصيص المنيو - ${res.res_name}</title>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>تخصيص المنيو - ${res.res_name}</title>
 <style>
-  body { font-family:Tahoma; background:#f4f7f6; padding:20px; }
-  .container { max-width:500px; margin:auto; background:white; padding:20px; border-radius:10px; }
-  label { display:block; margin-top:10px; }
-  input, select { width:100%; padding:8px; margin-top:5px; border:1px solid #ddd; border-radius:5px; }
-  button { margin-top:20px; padding:10px; background:#007bff; color:white; border:none; border-radius:5px; cursor:pointer; }
-  .logo-preview { max-width:150px; max-height:150px; margin-top:10px; }
+  * { box-sizing: border-box; }
+  body { font-family: Tahoma, Arial, sans-serif; background: #f4f7f6; padding: 15px; margin:0; }
+  .container { max-width: 500px; margin: auto; background: white; padding: 20px; border-radius: 10px; box-shadow:0 2px 10px rgba(0,0,0,0.1); }
+  h2 { text-align: center; margin-bottom: 25px; }
+  label { display: block; margin-top: 15px; font-weight: bold; }
+  input, select { width: 100%; padding: 12px; margin-top: 5px; border: 1px solid #ddd; border-radius: 5px; font-size: 1rem; }
+  button { width: 100%; margin-top: 25px; padding: 12px; background: #007bff; color: white; border: none; border-radius: 5px; font-size: 1.1rem; cursor: pointer; }
+  .logo-preview { max-width: 100%; max-height: 150px; margin: 10px 0; display: block; }
+  a { text-decoration: none; color: #007bff; display: inline-block; margin-top: 15px; }
 </style>
 </head>
 <body>
@@ -915,7 +990,7 @@ function renderSettingsHTML(res, settings) {
       </select>
 
       <label>شعار المطعم:</label>
-      ${settings.logo_url ? `<img src="${settings.logo_url}" class="logo-preview"><br>` : ''}
+      ${settings.logo_url ? `<img src="${settings.logo_url}" class="logo-preview">` : ''}
       <input type="file" name="logo" accept="image/*" id="logoInput">
       <input type="hidden" name="logo_url" id="logoUrl" value="${settings.logo_url}">
 
@@ -953,7 +1028,7 @@ function renderSettingsHTML(res, settings) {
 }
 
 // ==========================================
-// 9. صفحة المنيو العامة
+// 9. صفحة المنيو العامة (مُحسّنة للجوال)
 // ==========================================
 async function handlePublicMenuRoute(env, slug) {
   const res = await env.DB.prepare("SELECT * FROM restaurants WHERE slug = ?").bind(slug).first();
@@ -988,11 +1063,12 @@ function renderPublicMenuHTML(res, categories, uncategorized, settings) {
       --secondary: ${settings.secondary_color};
       --font: ${settings.font_family};
     }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      font-family: var(--font), Tahoma;
+      font-family: var(--font), Tahoma, Arial;
       background: #fafafa;
       margin: 0;
-      padding: 20px;
+      padding: 15px;
     }
     .header {
       text-align: center;
@@ -1000,6 +1076,8 @@ function renderPublicMenuHTML(res, categories, uncategorized, settings) {
     }
     .logo {
       max-height: 80px;
+      max-width: 100%;
+      object-fit: contain;
     }
     .category {
       margin-bottom: 40px;
@@ -1008,6 +1086,7 @@ function renderPublicMenuHTML(res, categories, uncategorized, settings) {
       color: var(--primary);
       border-bottom: 2px solid var(--primary);
       padding-bottom: 5px;
+      margin-bottom: 15px;
     }
     .items-grid {
       display: flex;
@@ -1019,10 +1098,15 @@ function renderPublicMenuHTML(res, categories, uncategorized, settings) {
       background: white;
       border: 1px solid #ddd;
       border-radius: 10px;
-      width: 200px;
+      width: calc(50% - 10px);
+      max-width: 200px;
       padding: 10px;
       text-align: center;
       box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      transition: transform 0.2s;
+    }
+    .item-card:hover {
+      transform: scale(1.02);
     }
     .item-card img {
       width: 100%;
@@ -1032,10 +1116,17 @@ function renderPublicMenuHTML(res, categories, uncategorized, settings) {
     }
     .item-card h3 {
       margin: 10px 0 5px;
+      font-size: 1.1rem;
     }
     .item-card .price {
       color: green;
       font-weight: bold;
+    }
+    @media (max-width: 480px) {
+      .item-card {
+        width: 100%;
+        max-width: 100%;
+      }
     }
   `;
 
@@ -1078,7 +1169,7 @@ function renderPublicMenuHTML(res, categories, uncategorized, settings) {
 
   return `<!DOCTYPE html>
 <html dir="rtl">
-<head><meta charset="UTF-8"><title>${res.res_name}</title>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>${res.res_name}</title>
 <style>${themeStyles}</style>
 </head>
 <body>
