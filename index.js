@@ -1,7 +1,7 @@
 // ==========================================
 // 1. الإعدادات العامة
 // ==========================================
-const MASTER_PASSWORD = env.MASTER_PASSWORD || "admin123"; // استخدام متغير البيئة مع fallback
+// لا يوجد تعريف عام لـ MASTER_PASSWORD هنا
 
 export default {
   async fetch(request, env) {
@@ -165,9 +165,11 @@ async function handleImageUpload(request, env) {
 }
 
 // ==========================================
-// 4. صفحة تسجيل الدخول
+// 4. صفحة تسجيل الدخول (معدلة)
 // ==========================================
 async function handleLoginRoute(request, env) {
+  const MASTER_PASSWORD = env.MASTER_PASSWORD || "admin123"; // تعريف المتغير هنا
+
   if (request.method === "POST") {
     const data = await request.formData();
     const user = data.get("user").toLowerCase().trim();
