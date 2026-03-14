@@ -1,7 +1,6 @@
 // ==========================================
-// دوال مساعدة عامة
+// utils.js - دوال مساعدة عامة
 // ==========================================
-
 
 // تسجيل النشاطات
 export async function logActivity(env, restaurantId, action, details) {
@@ -20,7 +19,7 @@ export function sanitizeFileName(fileName) {
   return fileName.replace(/[^a-zA-Z0-9.]/g, '_');
 }
 
-// إنشاء رابط آمن
+// إنشاء رابط آمن (slug)
 export function safeUrl(text) {
   return text.replace(/[^\w\s-]/g, '').replace(/\s+/g, '-').toLowerCase();
 }
