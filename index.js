@@ -1,8 +1,6 @@
 // ==========================================
 // 1. الإعدادات العامة
 // ==========================================
-// لا يوجد تعريف عام لـ MASTER_PASSWORD هنا
-
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -10,7 +8,6 @@ export default {
     const parts = pathname.split('/').filter(Boolean);
 
     try {
-      // التوجيه الذكي (Routing)
       if (pathname === "/" || pathname === "") return handleLoginRoute(request, env);
       if (parts[0] === "admin" && parts[1] === "master") return handleMasterRoute(request, env);
       
@@ -30,7 +27,6 @@ export default {
 
       return new Response("404 Not Found", { status: 404 });
     } catch (e) {
-      // عرض الخطأ بشكل مفصل للتشخيص
       return new Response(JSON.stringify({ error: e.message, stack: e.stack }), {
         status: 500,
         headers: { "Content-Type": "application/json" }
@@ -71,13 +67,11 @@ async function getFilteredRestaurants(env, url) {
 
   const { results: restaurants } = await env.DB.prepare(query).bind(...params).all();
 
-  // إحصائيات
   const totalCount = (await env.DB.prepare("SELECT COUNT(*) as count FROM restaurants").first()).count;
   const activeCount = (await env.DB.prepare("SELECT COUNT(*) as count FROM restaurants WHERE expires_at >= ?").bind(today).first()).count;
   const expiredCount = totalCount - activeCount;
   const totalItems = (await env.DB.prepare("SELECT COUNT(*) as count FROM items").first()).count;
 
-  // آخر نشاط
   for (let res of restaurants) {
     const lastLog = await env.DB.prepare(
       "SELECT action, timestamp FROM activity_logs WHERE restaurant_id = ? ORDER BY timestamp DESC LIMIT 1"
@@ -91,17 +85,20 @@ async function getFilteredRestaurants(env, url) {
 }
 
 // ==========================================
-// 3. رفع الصور إلى R2
+// 3. رفع الصور إلى R2 (مُحسّن مع رسائل خطأ)
 // ==========================================
 async function handleImageUpload(request, env) {
   // التحقق من ربط R2
   if (!env.R2) {
-    return new Response(JSON.stringify({ error: "❌ R2 bucket not bound to the worker. Please add a binding named 'R2'." }), {
+    return new Response(JSON.stringify({ 
+      error: "❌ خطأ في الإعدادات: لم يتم ربط مخزن الصور (R2) مع التطبيق. يرجى التواصل مع الدعم الفني." 
+    }), {
       status: 500,
       headers: { "Content-Type": "application/json" }
     });
   }
 
+  // التحقق من صلاحية المستخدم
   const cookie = request.headers.get("Cookie") || "";
   const isMaster = cookie.includes("auth_role=master");
   let restaurantSlug = null;
@@ -109,12 +106,15 @@ async function handleImageUpload(request, env) {
   if (match) restaurantSlug = match[1];
 
   if (!isMaster && !restaurantSlug) {
-    return new Response(JSON.stringify({ error: "❌ Unauthorized: You must be logged in." }), {
+    return new Response(JSON.stringify({ 
+      error: "❌ غير مصرح: يجب تسجيل الدخول أولاً." 
+    }), {
       status: 401,
       headers: { "Content-Type": "application/json" }
     });
   }
 
+  // الحصول على معرف المطعم
   let restaurantId;
   try {
     if (isMaster) {
@@ -122,53 +122,115 @@ async function handleImageUpload(request, env) {
       restaurantId = formData.get("restaurant_id");
     } else {
       const res = await env.DB.prepare("SELECT id FROM restaurants WHERE slug = ?").bind(restaurantSlug).first();
-      if (!res) return new Response(JSON.stringify({ error: "❌ Restaurant not found." }), { status: 404, headers: { "Content-Type": "application/json" } });
+      if (!res) {
+        return new Response(JSON.stringify({ 
+          error: "❌ المطعم غير موجود." 
+        }), { status: 404, headers: { "Content-Type": "application/json" } });
+      }
       restaurantId = res.id;
     }
   } catch (dbError) {
-    return new Response(JSON.stringify({ error: "❌ Database error: " + dbError.message }), {
+    return new Response(JSON.stringify({ 
+      error: "❌ خطأ في قاعدة البيانات: " + dbError.message 
+    }), {
       status: 500,
       headers: { "Content-Type": "application/json" }
     });
   }
 
-  const formData = await request.formData();
-  const file = formData.get("image");
-  if (!file) {
-    return new Response(JSON.stringify({ error: "❌ No image file uploaded." }), {
+  // استخراج الملف من الطلب
+  let formData;
+  try {
+    formData = await request.formData();
+  } catch (e) {
+    return new Response(JSON.stringify({ 
+      error: "❌ فشل قراءة بيانات النموذج. تأكد من إرسال البيانات بشكل صحيح." 
+    }), {
       status: 400,
       headers: { "Content-Type": "application/json" }
     });
   }
 
-  try {
-    const bytes = await file.arrayBuffer();
-    const buffer = new Uint8Array(bytes);
-
-    const fileName = `${restaurantId}/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
-
-    await env.R2.put(fileName, buffer, {
-      httpMetadata: { contentType: file.type }
-    });
-
-    const publicUrl = `https://images.topsafetypro.com/${fileName}`;
-
-    return new Response(JSON.stringify({ url: publicUrl }), {
+  const file = formData.get("image");
+  if (!file) {
+    return new Response(JSON.stringify({ 
+      error: "❌ لم يتم اختيار أي صورة. يرجى اختيار ملف صورة." 
+    }), {
+      status: 400,
       headers: { "Content-Type": "application/json" }
     });
-  } catch (r2Error) {
-    return new Response(JSON.stringify({ error: "❌ R2 upload failed: " + r2Error.message }), {
+  }
+
+  // التحقق من نوع الملف (يجب أن يكون صورة)
+  if (!file.type.startsWith("image/")) {
+    return new Response(JSON.stringify({ 
+      error: "❌ نوع الملف غير مدعوم. يرجى رفع صورة فقط (jpg, png, gif, إلخ)." 
+    }), {
+      status: 400,
+      headers: { "Content-Type": "application/json" }
+    });
+  }
+
+  // التحقق من حجم الملف (حد أقصى 5 ميجابايت)
+  const MAX_SIZE = 5 * 1024 * 1024; // 5 MB
+  if (file.size > MAX_SIZE) {
+    return new Response(JSON.stringify({ 
+      error: "❌ حجم الصورة كبير جداً. الحد الأقصى المسموح به هو 5 ميجابايت." 
+    }), {
+      status: 400,
+      headers: { "Content-Type": "application/json" }
+    });
+  }
+
+  // قراءة محتوى الملف
+  let bytes, buffer;
+  try {
+    bytes = await file.arrayBuffer();
+    buffer = new Uint8Array(bytes);
+  } catch (e) {
+    return new Response(JSON.stringify({ 
+      error: "❌ فشل قراءة محتوى الصورة. يرجى المحاولة مرة أخرى." 
+    }), {
       status: 500,
       headers: { "Content-Type": "application/json" }
     });
   }
+
+  // إنشاء اسم فريد للملف
+  const safeFileName = file.name.replace(/[^a-zA-Z0-9.]/g, '_');
+  const fileName = `${restaurantId}/${Date.now()}-${safeFileName}`;
+
+  // رفع الملف إلى R2
+  try {
+    await env.R2.put(fileName, buffer, {
+      httpMetadata: { contentType: file.type }
+    });
+  } catch (r2Error) {
+    return new Response(JSON.stringify({ 
+      error: "❌ فشل رفع الصورة إلى الخادم: " + r2Error.message 
+    }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" }
+    });
+  }
+
+  // إنشاء الرابط العام باستخدام النطاق المخصص
+  const publicUrl = `https://images.topsafetypro.com/${fileName}`;
+
+  // إرجاع الرابط بنجاح
+  return new Response(JSON.stringify({ 
+    url: publicUrl,
+    message: "✅ تم رفع الصورة بنجاح" 
+  }), {
+    headers: { "Content-Type": "application/json" }
+  });
 }
 
 // ==========================================
-// 4. صفحة تسجيل الدخول (معدلة)
+// 4. صفحة تسجيل الدخول
 // ==========================================
 async function handleLoginRoute(request, env) {
-  const MASTER_PASSWORD = env.MASTER_PASSWORD || "admin123"; // تعريف المتغير هنا
+  const MASTER_PASSWORD = env.MASTER_PASSWORD || "admin123";
 
   if (request.method === "POST") {
     const data = await request.formData();
@@ -354,7 +416,6 @@ function renderMasterHTML(restaurants, stats, searchParams, errorMsg = "") {
     <h1>👑 لوحة تحكم الماستر</h1>
     ${errorMsg ? `<div class="error">${errorMsg}</div>` : ''}
 
-    <!-- الإحصائيات -->
     <div class="stats">
       <div class="stat-card"><h3>إجمالي المطاعم</h3><div class="number">${stats.totalCount}</div></div>
       <div class="stat-card"><h3>المطاعم النشطة</h3><div class="number">${stats.activeCount}</div></div>
@@ -362,11 +423,9 @@ function renderMasterHTML(restaurants, stats, searchParams, errorMsg = "") {
       <div class="stat-card"><h3>إجمالي الوجبات</h3><div class="number">${stats.totalItems}</div></div>
     </div>
 
-    <!-- إشعارات الانتهاء -->
     ${expiredCount > 0 ? `<div class="alert alert-danger">⚠️ هناك ${expiredCount} مطعم منتهي الاشتراك.</div>` : ''}
     ${nearExpiryCount > 0 ? `<div class="alert alert-warning">⏰ هناك ${nearExpiryCount} مطعم على وشك الانتهاء (أقل من 3 أيام).</div>` : ''}
 
-    <!-- إضافة مطعم -->
     <div class="card">
       <h3>➕ إضافة مطعم جديد</h3>
       <form method="POST" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(150px,1fr)); gap:10px;">
@@ -380,7 +439,6 @@ function renderMasterHTML(restaurants, stats, searchParams, errorMsg = "") {
       </form>
     </div>
 
-    <!-- فلترة وبحث -->
     <div class="filters">
       <form method="GET" style="display:flex; gap:10px; width:100%; flex-wrap:wrap;">
         <input type="text" name="search" placeholder="بحث باسم المطعم أو slug" value="${searchParam}" style="flex:2;">
@@ -393,7 +451,6 @@ function renderMasterHTML(restaurants, stats, searchParams, errorMsg = "") {
       </form>
     </div>
 
-    <!-- جدول المطاعم -->
     <div class="card">
       <table>
         <thead>
@@ -405,7 +462,6 @@ function renderMasterHTML(restaurants, stats, searchParams, errorMsg = "") {
       </table>
     </div>
 
-    <!-- نافذة تعديل المطعم -->
     <div id="editModal" class="modal" onclick="if(event.target===this) this.style.display='none'">
       <div class="modal-content">
         <h3>✏️ تعديل المطعم</h3>
@@ -528,7 +584,6 @@ function renderCategoriesHTML(res, categories) {
     <a href="/admin/${res.slug}">🔙 العودة للوحة المطعم</a>
   </div>
 
-  <!-- نافذة تعديل الفئة -->
   <div id="editCatModal" class="modal" onclick="if(event.target===this) this.style.display='none'">
     <div class="modal-content">
       <h3>✏️ تعديل الفئة</h3>
@@ -676,7 +731,6 @@ function renderRestaurantHTML(res, items, categories, settings, origin) {
     <p><a href="/admin/${res.slug}/categories">📁 إدارة الفئات</a> | <a href="/admin/${res.slug}/settings">⚙️ تخصيص المظهر</a></p>
     <hr>
 
-    <!-- نموذج إضافة وجبة -->
     <div class="add-form">
       <h3>➕ إضافة وجبة جديدة</h3>
       <form method="POST" enctype="multipart/form-data" onsubmit="event.preventDefault(); uploadImageAndSubmit(this);">
@@ -693,10 +747,8 @@ function renderRestaurantHTML(res, items, categories, settings, origin) {
       </form>
     </div>
 
-    <!-- قائمة الوجبات -->
     <ul>${itemsList || '<p style="text-align:center;">لا توجد وجبات بعد</p>'}</ul>
 
-    <!-- نافذة تعديل وجبة -->
     <div id="editItemModal" class="modal">
       <div class="modal-content">
         <h3>✏️ تعديل الوجبة</h3>
@@ -732,11 +784,15 @@ function renderRestaurantHTML(res, items, categories, settings, origin) {
         
         const response = await fetch('/upload/image', { method: 'POST', body: formData });
         const data = await response.json();
-        imageUrlInput.value = data.url;
+        if (data.error) {
+          alert(data.error);
+        } else {
+          imageUrlInput.value = data.url;
+          form.submit();
+        }
+      } else {
+        form.submit();
       }
-      
-      fileInput.disabled = true;
-      form.submit();
     }
 
     async function updateItem(form) {
@@ -750,11 +806,15 @@ function renderRestaurantHTML(res, items, categories, settings, origin) {
         
         const response = await fetch('/upload/image', { method: 'POST', body: formData });
         const data = await response.json();
-        imageUrlInput.value = data.url;
+        if (data.error) {
+          alert(data.error);
+        } else {
+          imageUrlInput.value = data.url;
+          form.submit();
+        }
+      } else {
+        form.submit();
       }
-      
-      fileInput.disabled = true;
-      form.submit();
     }
 
     function openEditItemModal(id, name, price, categoryId, imageUrl) {
@@ -878,11 +938,15 @@ function renderSettingsHTML(res, settings) {
         
         const response = await fetch('/upload/image', { method: 'POST', body: formData });
         const data = await response.json();
-        logoUrlInput.value = data.url;
+        if (data.error) {
+          alert(data.error);
+        } else {
+          logoUrlInput.value = data.url;
+          form.submit();
+        }
+      } else {
+        form.submit();
       }
-      
-      fileInput.disabled = true;
-      form.submit();
     }
   </script>
 </body>
