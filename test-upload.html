@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>اختبار رفع الصورة</title>
+    <style>
+        body { font-family: Tahoma; padding: 20px; background: #f4f7f6; }
+        .container { max-width: 500px; margin: auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        input, button { padding: 10px; margin: 10px 0; width: 100%; border: 1px solid #ddd; border-radius: 5px; }
+        button { background: #007bff; color: white; border: none; cursor: pointer; }
+        .result { background: #f0f0f0; padding: 15px; border-radius: 5px; white-space: pre-wrap; font-family: monospace; direction: ltr; }
+        .error { color: red; }
+        .success { color: green; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>🔍 اختبار رفع الصورة</h2>
+        <p>هذه الصفحة ترسل صورة إلى المسار <code>/upload/image</code> وتعرض الاستجابة.</p>
+        <p><strong>ملاحظة:</strong> تأكد أنك تتصفح هذه الصفحة على النطاق الصحيح: <code>https://menu.topsafetypro.com</code></p>
+        
+        <form id="uploadForm">
+            <input type="file" name="image" id="imageInput" accept="image/*" required>
+            <button type="submit">رفع الصورة</button>
+        </form>
+
+        <h3>الاستجابة من الخادم:</h3>
+        <div id="result" class="result">لم يتم رفع أي صورة بعد.</div>
+    </div>
+
+    <script>
+        document.getElementById('uploadForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const fileInput = document.getElementById('imageInput');
+            const file = fileInput.files[0];
+            if (!file) {
+                alert('الرجاء اختيار ملف أولاً.');
+                return;
+            }
+
+            const resultDiv = document.getElementById('result');
+            resultDiv.textContent = 'جاري الرفع...';
+
+            try {
+                const formData = new FormData();
+                formData.append('image', file);  // اسم الحقل "image" يطابق الكود في الـ Worker
+
+                const response = await fetch('/upload/image', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const responseText = await response.text();
+                let jsonData;
+                try {
+                    jsonData = JSON.parse(responseText);
+                } catch (e) {
+                    jsonData = { error: 'الاستجابة ليست JSON صالح', raw: responseText };
+                }
+
+                // عرض النتيجة بشكل منظم
+                if (response.ok && jsonData.url) {
+                    resultDiv.innerHTML = `<span class="success">✅ نجاح</span>\n\n${JSON.stringify(jsonData, null, 2)}\n\nرابط الصورة: <a href="${jsonData.url}" target="_blank">${jsonData.url}</a>`;
+                } else {
+                    resultDiv.innerHTML = `<span class="error">❌ فشل</span>\n\n${JSON.stringify(jsonData, null, 2)}`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<span class="error">❌ خطأ في الاتصال</span>\n\n${error.message}`;
+            }
+        });
+    </script>
+</body>
+</html>
