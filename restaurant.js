@@ -134,18 +134,22 @@ function renderRestaurantHTML(res, items, categories, settings, origin, info, ta
   `).join('');
 
   // ========== عرض الطاولات مع إمكانية الإدارة ==========
-  const tablesHtml = tables.map(t => `
-    <div style="display:flex; align-items:center; gap:5px; margin:5px; background:#f9f9f9; padding:5px; border-radius:5px;">
-      <span style="flex:1;">${t.table_name}</span>
-      <button onclick="editTable(${t.id}, '${t.table_name}')" style="background:orange; color:white; border:none; padding:2px 8px; border-radius:3px;">✏️</button>
-      <form method="POST" style="display:inline;" onsubmit="return confirm('حذف هذه الطاولة؟');">
-        <input type="hidden" name="action" value="delete_table">
-        <input type="hidden" name="table_id" value="${t.id}">
-        <button style="background:red; color:white; border:none; padding:2px 8px; border-radius:3px;">🗑️</button>
-      </form>
-      <a href="/menu/${res.slug}?table=${t.id}" target="_blank" style="background:${settings.primary_color}; color:white; padding:2px 8px; border-radius:3px; text-decoration:none;">🔗 QR</a>
-    </div>
-  `).join('');
+const tablesHtml = tables.map(t => `
+  <div style="display:flex; align-items:center; gap:5px; margin:5px; background:#f9f9f9; padding:5px; border-radius:5px; flex-wrap:wrap;">
+    <span style="flex:1;">${t.table_name}</span>
+    <button onclick="editTable(${t.id}, '${t.table_name}')" style="background:orange; color:white; border:none; padding:2px 8px; border-radius:3px;">✏️</button>
+    <form method="POST" style="display:inline;" onsubmit="return confirm('حذف هذه الطاولة؟');">
+      <input type="hidden" name="action" value="delete_table">
+      <input type="hidden" name="table_id" value="${t.id}">
+      <button style="background:red; color:white; border:none; padding:2px 8px; border-radius:3px;">🗑️</button>
+    </form>
+    <a href="/menu/${res.slug}?table=${t.id}" target="_blank" style="background:${settings.primary_color}; color:white; padding:2px 8px; border-radius:3px; text-decoration:none;">🔗</a>
+    <img src="https://api.qrserver.com/v1/create-qr-code/?size=60x60&data=${encodeURIComponent(origin + '/menu/' + res.slug + '?table=' + t.id)}" 
+         style="width:50px; height:50px; border-radius:5px; cursor:pointer;" 
+         title="QR code لـ ${t.table_name}" 
+         onclick="window.open('${origin + '/menu/' + res.slug + '?table=' + t.id}')">
+  </div>
+`).join('');
 
   return `<!DOCTYPE html>
 <html dir="rtl">
