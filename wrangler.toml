@@ -8,7 +8,7 @@ binding = "DB"
 database_name = "menu_db"
 database_id = "81107e96-c3f0-4470-b6b9-35cb6c6a2311"
 
-# ربط R2 (إذا كنت تستخدمه لرفع الصور)
+# ربط R2 (لرفع الصور)
 [[r2_buckets]]
 binding = "R2"
-bucket_name = "menu-images"   # تأكد أن اسم الحاوية صحيح
+bucket_name = "menu-images"
