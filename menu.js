@@ -706,242 +706,282 @@ function renderPublicMenuHTML(res, categories, uncategorized, settings, tableNam
     </div>
   </div>
 
-  <script>
-    let cart = JSON.parse(localStorage.getItem('cart')) || [];
-    let currentItem = null;
+ <script>
+  // التحقق من توفر localStorage
+  let storageAvailable = true;
+  try {
+    localStorage.setItem('test', 'test');
+    localStorage.removeItem('test');
+  } catch(e) {
+    storageAvailable = false;
+    console.warn('localStorage غير متاح، سيتم استخدام متغير مؤقت');
+  }
 
-// تحسينات للجوال - إعادة ربط الأحداث
-document.addEventListener('DOMContentLoaded', function() {
-  // ربط زر السلة
-  const cartToggle = document.querySelector('.cart-toggle');
-  if (cartToggle) {
-    cartToggle.addEventListener('click', toggleCart);
+  // تهيئة السلة
+  let cart = [];
+  if (storageAvailable) {
+    try {
+      cart = JSON.parse(localStorage.getItem('cart')) || [];
+    } catch {
+      cart = [];
+    }
+  } else {
+    cart = [];
   }
   
-  // ربط أزرار الإضافة
-  document.querySelectorAll('.add-to-cart-btn').forEach(btn => {
-    btn.removeEventListener('click', btnClickHandler); // إزالة أي مستمع سابق
-    btn.addEventListener('click', btnClickHandler);
-  });
-});
+  let currentItem = null;
 
-function btnClickHandler(e) {
-  e.stopPropagation();
-  const btn = e.currentTarget;
-  const id = btn.dataset.id;
-  const name = btn.dataset.name;
-  const price = parseFloat(btn.dataset.price);
-  openOptionsModal(id, name, price);
-}
-function toggleCart() {
-  const panel = document.getElementById('cartPanel');
-  if (panel) {
-    panel.classList.toggle('show');
+  console.log('✅ تم تحميل الصفحة، السلة مهيأة');
+  console.log('عدد العناصر في السلة:', cart.length);
+  console.log('زر السلة موجود:', document.querySelector('.cart-toggle') !== null);
+
+  function saveCart() {
+    if (storageAvailable) {
+      localStorage.setItem('cart', JSON.stringify(cart));
+    }
+    updateCartCount();
+    updateCartPanel();
+  }
+
+  function updateCartCount() {
+    const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
+    document.getElementById('cartCount').innerText = totalItems;
+  }
+
+  async function openOptionsModal(id, name, price) {
+    try {
+      const response = await fetch('/api/options/' + id);
+      const options = await response.json();
+      
+      document.getElementById('modalItemName').innerText = name;
+      let optionsHtml = '<h4 style="margin-bottom:10px;">🔘 الخيارات المتاحة:</h4>';
+      
+      if (options.length > 0) {
+        options.forEach(opt => {
+          optionsHtml += \`
+            <div class="option-item">
+              <label style="display:flex; align-items:center; gap:10px;">
+                <input type="checkbox" class="option-checkbox" data-id="\${opt.id}" data-name="\${opt.option_name}" data-price="\${opt.option_price}">
+                <span>\${opt.option_name}</span>
+                \${opt.option_price > 0 ? '<span style="color:green;">(+' + opt.option_price + ' ريال)</span>' : ''}
+              </label>
+            </div>
+          \`;
+        });
+      } else {
+        optionsHtml += '<p style="color:#666;">لا توجد خيارات إضافية لهذه الوجبة</p>';
+      }
+      
+      document.getElementById('modalOptions').innerHTML = optionsHtml;
+      document.getElementById('optionsModal').classList.add('show');
+      
+      currentItem = { id, name, basePrice: price };
+    } catch (err) {
+      alert('حدث خطأ أثناء جلب الخيارات');
+    }
+  }
+
+  function closeModal() {
+    document.getElementById('optionsModal').classList.remove('show');
+  }
+
+  function confirmAdd() {
+    const selectedOptions = [];
+    document.querySelectorAll('.option-checkbox:checked').forEach(cb => {
+      selectedOptions.push({
+        id: cb.dataset.id,
+        name: cb.dataset.name,
+        price: parseFloat(cb.dataset.price)
+      });
+    });
+    const note = document.getElementById('modalNote').value.trim();
+    
+    addToCart(currentItem.id, currentItem.name, currentItem.basePrice, selectedOptions, note);
+    closeModal();
+  }
+
+  function addToCart(id, name, basePrice, options, note) {
+    const totalPrice = basePrice + options.reduce((sum, opt) => sum + opt.price, 0);
+    const cartItem = {
+      id,
+      name,
+      basePrice,
+      options,
+      note,
+      totalPrice,
+      quantity: 1
+    };
+    
+    const existingIndex = cart.findIndex(item => 
+      item.id === id && 
+      JSON.stringify(item.options) === JSON.stringify(options) && 
+      item.note === note
+    );
+    
+    if (existingIndex >= 0) {
+      cart[existingIndex].quantity += 1;
+    } else {
+      cart.push(cartItem);
+    }
+    
+    saveCart();
+    // إظهار السلة بعد الإضافة مباشرة
+    toggleCart(true);
+  }
+
+  function updateCartPanel() {
+    const panel = document.getElementById('cartPanel');
+    if (cart.length === 0) {
+      panel.innerHTML = '<p style="text-align:center;">السلة فارغة</p>';
+      return;
+    }
+    
+    let total = 0;
+    let html = '';
+    
+    cart.forEach((item, index) => {
+      total += item.totalPrice * item.quantity;
+      html += \`
+        <div class="cart-item">
+          <div class="cart-item-details">
+            <div class="cart-item-name">\${item.name} x\${item.quantity}</div>
+            \${item.options.length > 0 ? '<div class="cart-item-options">' + item.options.map(o => o.name).join(', ') + '</div>' : ''}
+            \${item.note ? '<div class="cart-item-options">📝 ' + item.note + '</div>' : ''}
+            <div>\${item.totalPrice * item.quantity} ريال</div>
+          </div>
+          <div class="cart-item-actions">
+            <button onclick="updateQuantity(\${index}, -1)">-</button>
+            <button onclick="updateQuantity(\${index}, 1)">+</button>
+            <button onclick="removeItem(\${index})">🗑️</button>
+          </div>
+        </div>
+      \`;
+    });
+    
+    html += \`<div class="cart-total">المجموع: \${total} ريال</div>\`;
+    html += \`<button class="whatsapp-btn" onclick="sendOrder()">📱 إرسال الطلب عبر واتساب</button>\`;
+    html += \`<button onclick="clearCart()" style="width:100%; padding:10px; margin-top:10px; background:#dc3545; color:white; border:none; border-radius:10px;">تفريغ السلة</button>\`;
+    
+    panel.innerHTML = html;
+  }
+
+  function toggleCart(forceShow) {
+    const panel = document.getElementById('cartPanel');
+    if (!panel) return;
+    
+    if (forceShow === true) {
+      panel.classList.add('show');
+    } else {
+      panel.classList.toggle('show');
+    }
+    
     if (cart.length === 0) {
       panel.classList.remove('show');
     }
   }
-}
-    function updateCartCount() {
-      const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
-      document.getElementById('cartCount').innerText = totalItems;
-    }
 
-    async function openOptionsModal(id, name, price) {
-      try {
-        const response = await fetch('/api/options/' + id);
-        const options = await response.json();
-        
-        document.getElementById('modalItemName').innerText = name;
-        let optionsHtml = '<h4 style="margin-bottom:10px;">🔘 الخيارات المتاحة:</h4>';
-        
-        if (options.length > 0) {
-          options.forEach(opt => {
-            optionsHtml += \`
-              <div class="option-item">
-                <label style="display:flex; align-items:center; gap:10px;">
-                  <input type="checkbox" class="option-checkbox" data-id="\${opt.id}" data-name="\${opt.option_name}" data-price="\${opt.option_price}">
-                  <span>\${opt.option_name}</span>
-                  \${opt.option_price > 0 ? '<span style="color:green;">(+' + opt.option_price + ' ريال)</span>' : ''}
-                </label>
-              </div>
-            \`;
-          });
-        } else {
-          optionsHtml += '<p style="color:#666;">لا توجد خيارات إضافية لهذه الوجبة</p>';
-        }
-        
-        document.getElementById('modalOptions').innerHTML = optionsHtml;
-        document.getElementById('optionsModal').classList.add('show');
-        
-        currentItem = { id, name, basePrice: price };
-      } catch (err) {
-        alert('حدث خطأ أثناء جلب الخيارات');
-      }
-    }
-
-    function closeModal() {
-      document.getElementById('optionsModal').classList.remove('show');
-    }
-
-    function confirmAdd() {
-      const selectedOptions = [];
-      document.querySelectorAll('.option-checkbox:checked').forEach(cb => {
-        selectedOptions.push({
-          id: cb.dataset.id,
-          name: cb.dataset.name,
-          price: parseFloat(cb.dataset.price)
-        });
-      });
-      const note = document.getElementById('modalNote').value.trim();
-      
-      addToCart(currentItem.id, currentItem.name, currentItem.basePrice, selectedOptions, note);
-      closeModal();
-    }
-
-    function addToCart(id, name, basePrice, options, note) {
-      const totalPrice = basePrice + options.reduce((sum, opt) => sum + opt.price, 0);
-      const cartItem = {
-        id,
-        name,
-        basePrice,
-        options,
-        note,
-        totalPrice,
-        quantity: 1
-      };
-      
-      const existingIndex = cart.findIndex(item => 
-        item.id === id && 
-        JSON.stringify(item.options) === JSON.stringify(options) && 
-        item.note === note
-      );
-      
-      if (existingIndex >= 0) {
-        cart[existingIndex].quantity += 1;
-      } else {
-        cart.push(cartItem);
-      }
-      
-      localStorage.setItem('cart', JSON.stringify(cart));
-      updateCartCount();
-      updateCartPanel();
-    }
-
-    function updateCartPanel() {
-      const panel = document.getElementById('cartPanel');
-      if (cart.length === 0) {
-        panel.innerHTML = '<p style="text-align:center;">السلة فارغة</p>';
-        return;
-      }
-      
-      let total = 0;
-      let html = '';
-      
-      cart.forEach((item, index) => {
-        total += item.totalPrice * item.quantity;
-        html += \`
-          <div class="cart-item">
-            <div class="cart-item-details">
-              <div class="cart-item-name">\${item.name} x\${item.quantity}</div>
-              \${item.options.length > 0 ? '<div class="cart-item-options">' + item.options.map(o => o.name).join(', ') + '</div>' : ''}
-              \${item.note ? '<div class="cart-item-options">📝 ' + item.note + '</div>' : ''}
-              <div>\${item.totalPrice * item.quantity} ريال</div>
-            </div>
-            <div class="cart-item-actions">
-              <button onclick="updateQuantity(\${index}, -1)">-</button>
-              <button onclick="updateQuantity(\${index}, 1)">+</button>
-              <button onclick="removeItem(\${index})">🗑️</button>
-            </div>
-          </div>
-        \`;
-      });
-      
-      html += \`<div class="cart-total">المجموع: \${total} ريال</div>\`;
-      html += \`<button class="whatsapp-btn" onclick="sendOrder()">📱 إرسال الطلب عبر واتساب</button>\`;
-      html += \`<button onclick="clearCart()" style="width:100%; padding:10px; margin-top:10px; background:#dc3545; color:white; border:none; border-radius:10px;">تفريغ السلة</button>\`;
-      
-      panel.innerHTML = html;
-    }
-
-    function toggleCart() {
-      document.getElementById('cartPanel').classList.toggle('show');
-    }
-
-    function updateQuantity(index, delta) {
-      cart[index].quantity += delta;
-      if (cart[index].quantity <= 0) {
-        cart.splice(index, 1);
-      }
-      localStorage.setItem('cart', JSON.stringify(cart));
-      updateCartCount();
-      updateCartPanel();
-    }
-
-    function removeItem(index) {
+  function updateQuantity(index, delta) {
+    cart[index].quantity += delta;
+    if (cart[index].quantity <= 0) {
       cart.splice(index, 1);
-      localStorage.setItem('cart', JSON.stringify(cart));
-      updateCartCount();
-      updateCartPanel();
     }
+    saveCart();
+  }
 
-    function clearCart() {
-      cart = [];
-      localStorage.setItem('cart', JSON.stringify(cart));
-      updateCartCount();
-      updateCartPanel();
-    }
+  function removeItem(index) {
+    cart.splice(index, 1);
+    saveCart();
+  }
 
-    function sendOrder() {
-      if (cart.length === 0) return alert('السلة فارغة');
-      const phone = "${info.whatsapp || ''}".replace(/\\D/g, '');
-      if (!phone) return alert('رقم واتساب المطعم غير مضبوط');
+  function clearCart() {
+    cart = [];
+    saveCart();
+  }
 
-      let orderText = 'طلب جديد من المنيو';
-      if ("${tableName}") orderText += ' (' + "${tableName}" + ')';
-      orderText += ':\\n';
-      let total = 0;
-      
-      cart.forEach(item => {
-        orderText += \`\\n🍽️ \${item.name} x\${item.quantity}\`;
-        if (item.options.length > 0) {
-          orderText += ' (' + item.options.map(o => o.name).join(', ') + ')';
-        }
-        if (item.note) {
-          orderText += \`\\n   📝 ملاحظة: \${item.note}\`;
-        }
-        orderText += \`\\n   💰 \${item.totalPrice * item.quantity} ريال\`;
-        total += item.totalPrice * item.quantity;
+  function sendOrder() {
+    if (cart.length === 0) return alert('السلة فارغة');
+    const phone = "${info.whatsapp || ''}".replace(/\\D/g, '');
+    if (!phone) return alert('رقم واتساب المطعم غير مضبوط');
+
+    let orderText = 'طلب جديد من المنيو';
+    if ("${tableName}") orderText += ' (' + "${tableName}" + ')';
+    orderText += ':\\n';
+    let total = 0;
+    
+    cart.forEach(item => {
+      orderText += \`\\n🍽️ \${item.name} x\${item.quantity}\`;
+      if (item.options.length > 0) {
+        orderText += ' (' + item.options.map(o => o.name).join(', ') + ')';
+      }
+      if (item.note) {
+        orderText += \`\\n   📝 ملاحظة: \${item.note}\`;
+      }
+      orderText += \`\\n   💰 \${item.totalPrice * item.quantity} ريال\`;
+      total += item.totalPrice * item.quantity;
+    });
+    
+    orderText += \`\\n\\n💰 الإجمالي: \${total} ريال\`;
+    window.open(\`https://wa.me/\${phone}?text=\${encodeURIComponent(orderText)}\`, '_blank');
+  }
+
+  // ربط الأحداث بعد تحميل الصفحة
+  document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOM جاهز، جاري ربط الأحداث');
+    
+    // ربط زر السلة
+    const cartToggle = document.querySelector('.cart-toggle');
+    if (cartToggle) {
+      cartToggle.addEventListener('click', function(e) {
+        e.preventDefault();
+        toggleCart();
       });
-      
-      orderText += \`\\n\\n💰 الإجمالي: \${total} ريال\`;
-      window.open(\`https://wa.me/\${phone}?text=\${encodeURIComponent(orderText)}\`, '_blank');
     }
-
+    
     // ربط أزرار الإضافة
-    document.querySelectorAll('.add-to-cart-btn').forEach(btn => {
-      btn.addEventListener('click', (e) => {
+    const buttons = document.querySelectorAll('.add-to-cart-btn');
+    console.log('عدد أزرار الإضافة:', buttons.length);
+    
+    buttons.forEach(btn => {
+      btn.addEventListener('click', function(e) {
+        e.preventDefault();
         e.stopPropagation();
-        const id = btn.dataset.id;
-        const name = btn.dataset.name;
-        const price = parseFloat(btn.dataset.price);
+        const id = this.dataset.id;
+        const name = this.dataset.name;
+        const price = parseFloat(this.dataset.price);
+        console.log('تم النقر على زر الإضافة:', name);
         openOptionsModal(id, name, price);
       });
     });
-
-    // البحث
-    document.getElementById('searchInput').addEventListener('input', function(e) {
-      const term = e.target.value.toLowerCase();
-      document.querySelectorAll('.item-card').forEach(card => {
-        const name = card.querySelector('.item-name').textContent.toLowerCase();
-        card.style.display = name.includes(term) ? 'block' : 'none';
-      });
-    });
-
-    // تهيئة السلة
+    
+    // تحديث السلة
     updateCartCount();
     updateCartPanel();
-  </script>
+  });
+
+  // إعادة ربط الأحداث إذا تم تغيير DOM ديناميكياً (للبحث)
+  const searchInput = document.getElementById('searchInput');
+  if (searchInput) {
+    searchInput.addEventListener('input', function() {
+      // بعد تغيير نتائج البحث، قد تحتاج الأزرار الجديدة إلى ربط
+      setTimeout(function() {
+        document.querySelectorAll('.add-to-cart-btn').forEach(btn => {
+          btn.removeEventListener('click', btnClickHandler);
+          btn.addEventListener('click', btnClickHandler);
+        });
+      }, 100);
+    });
+  }
+
+  function btnClickHandler(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    const btn = e.currentTarget;
+    const id = btn.dataset.id;
+    const name = btn.dataset.name;
+    const price = parseFloat(btn.dataset.price);
+    openOptionsModal(id, name, price);
+  }
+</script>
 </body>
 </html>`;
 }
