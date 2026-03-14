@@ -22,10 +22,12 @@ export async function handleRestaurantRoute(request, env, slug, origin) {
 
   const info = await getRestaurantInfo(env, res.id);
 
+  // ========== معالجة إجراءات الطاولات ==========
   if (request.method === "POST") {
     const data = await request.formData();
     const action = data.get("action");
 
+    // إجراءات الوجبات (موجودة مسبقاً)
     if (action === "add") {
       const name = data.get("name");
       const price = data.get("price");
@@ -57,9 +59,34 @@ export async function handleRestaurantRoute(request, env, slug, origin) {
       await logActivity(env, res.id, "item_delete", `حذف وجبة ID: ${itemId}`);
     }
 
+    // ========== إجراءات الطاولات الجديدة ==========
+    else if (action === "add_table") {
+      const tableName = data.get("table_name");
+      await env.DB.prepare(
+        "INSERT INTO tables (restaurant_id, table_name) VALUES (?, ?)"
+      ).bind(res.id, tableName).run();
+      await logActivity(env, res.id, "table_add", `أضاف طاولة ${tableName}`);
+
+    } else if (action === "edit_table") {
+      const tableId = data.get("table_id");
+      const tableName = data.get("table_name");
+      await env.DB.prepare(
+        "UPDATE tables SET table_name = ? WHERE id = ? AND restaurant_id = ?"
+      ).bind(tableName, tableId, res.id).run();
+      await logActivity(env, res.id, "table_edit", `عدل اسم طاولة إلى ${tableName}`);
+
+    } else if (action === "delete_table") {
+      const tableId = data.get("table_id");
+      await env.DB.prepare(
+        "DELETE FROM tables WHERE id = ? AND restaurant_id = ?"
+      ).bind(tableId, res.id).run();
+      await logActivity(env, res.id, "table_delete", `حذف طاولة`);
+    }
+
     return Response.redirect(new URL(`/admin/${slug}`, request.url));
   }
 
+  // جلب الوجبات
   const { results: items } = await env.DB.prepare(`
     SELECT items.*, categories.name as category_name 
     FROM items 
@@ -68,14 +95,19 @@ export async function handleRestaurantRoute(request, env, slug, origin) {
     ORDER BY items.featured DESC, categories.sort_order, categories.name, items.name
   `).bind(res.id).all();
 
+  // جلب الطاولات من قاعدة البيانات
+  const { results: tables } = await env.DB.prepare(
+    "SELECT * FROM tables WHERE restaurant_id = ? ORDER BY id"
+  ).bind(res.id).all();
+
   const settings = await getRestaurantSettings(env, res.id);
 
-  return new Response(renderRestaurantHTML(res, items, categories, settings, origin, info), {
+  return new Response(renderRestaurantHTML(res, items, categories, settings, origin, info, tables), {
     headers: { "Content-Type": "text/html; charset=utf-8" }
   });
 }
 
-function renderRestaurantHTML(res, items, categories, settings, origin, info) {
+function renderRestaurantHTML(res, items, categories, settings, origin, info, tables) {
   const menuUrl = `${origin}/menu/${res.slug}`;
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(menuUrl)}`;
 
@@ -101,10 +133,19 @@ function renderRestaurantHTML(res, items, categories, settings, origin, info) {
     </li>
   `).join('');
 
-  // روابط الطاولات
-  const tableLinks = Array.from({ length: info.number_of_tables || 5 }, (_, i) => i + 1)
-    .map(n => `<a href="/menu/${res.slug}?table=${n}" target="_blank" style="background: ${settings.primary_color}; color: white; padding: 8px 15px; border-radius: 5px; text-decoration: none; margin: 5px; display: inline-block;">طاولة ${n}</a>`)
-    .join('');
+  // ========== عرض الطاولات مع إمكانية الإدارة ==========
+  const tablesHtml = tables.map(t => `
+    <div style="display:flex; align-items:center; gap:5px; margin:5px; background:#f9f9f9; padding:5px; border-radius:5px;">
+      <span style="flex:1;">${t.table_name}</span>
+      <button onclick="editTable(${t.id}, '${t.table_name}')" style="background:orange; color:white; border:none; padding:2px 8px; border-radius:3px;">✏️</button>
+      <form method="POST" style="display:inline;" onsubmit="return confirm('حذف هذه الطاولة؟');">
+        <input type="hidden" name="action" value="delete_table">
+        <input type="hidden" name="table_id" value="${t.id}">
+        <button style="background:red; color:white; border:none; padding:2px 8px; border-radius:3px;">🗑️</button>
+      </form>
+      <a href="/menu/${res.slug}?table=${t.id}" target="_blank" style="background:${settings.primary_color}; color:white; padding:2px 8px; border-radius:3px; text-decoration:none;">🔗 QR</a>
+    </div>
+  `).join('');
 
   return `<!DOCTYPE html>
 <html dir="rtl">
@@ -163,12 +204,37 @@ function renderRestaurantHTML(res, items, categories, settings, origin, info) {
       </form>
     </div>
 
-    <!-- روابط الطاولات -->
+    <!-- ========== إدارة الطاولات (مطورة) ========== -->
     <div class="qr-tables">
-      <h3>🪑 روابط QR للطاولات</h3>
-      <p>استخدم هذه الروابط لإنشاء QR code لكل طاولة (${info.number_of_tables || 5} طاولة):</p>
-      <div style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: center;">
-        ${tableLinks}
+      <h3>🪑 إدارة الطاولات</h3>
+      <p>يمكنك إضافة وتعديل وحذف الطاولات، واستخدام الرابط المخصص لكل طاولة لإنشاء QR code.</p>
+      
+      <!-- قائمة الطاولات -->
+      <div style="margin-bottom:15px;">
+        ${tablesHtml || '<p style="color:#666;">لا توجد طاولات مضافة بعد.</p>'}
+      </div>
+
+      <!-- نموذج إضافة طاولة جديدة -->
+      <form method="POST" style="display:flex; gap:5px; margin-top:10px;">
+        <input type="hidden" name="action" value="add_table">
+        <input type="text" name="table_name" placeholder="اسم الطاولة (مثال: طاولة 4)" required style="flex:1; padding:8px; border:1px solid #ddd; border-radius:5px;">
+        <button type="submit" style="background:#28a745; color:white; border:none; padding:8px 15px; border-radius:5px; cursor:pointer;">➕ إضافة طاولة</button>
+      </form>
+
+      <!-- نافذة تعديل الطاولة (ستظهر عبر JavaScript) -->
+      <div id="editTableModal" class="modal" onclick="if(event.target===this) this.style.display='none'">
+        <div class="modal-content">
+          <h3>✏️ تعديل اسم الطاولة</h3>
+          <form method="POST" id="editTableForm">
+            <input type="hidden" name="action" value="edit_table">
+            <input type="hidden" name="table_id" id="editTableId">
+            <input type="text" name="table_name" id="editTableName" required style="width:100%; padding:8px; margin:10px 0;">
+            <div style="display:flex; gap:10px; justify-content:flex-end;">
+              <button type="button" onclick="document.getElementById('editTableModal').style.display='none'" style="background:#6c757d; color:white; border:none; padding:8px 15px; border-radius:5px;">إلغاء</button>
+              <button type="submit" style="background:#007bff; color:white; border:none; padding:8px 15px; border-radius:5px;">حفظ</button>
+            </div>
+          </form>
+        </div>
       </div>
     </div>
 
@@ -263,6 +329,20 @@ function renderRestaurantHTML(res, items, categories, settings, origin, info) {
 
     function closeEditModal() {
       document.getElementById('editItemModal').style.display = 'none';
+    }
+
+    // دوال إدارة الطاولات
+    function editTable(id, name) {
+      document.getElementById('editTableId').value = id;
+      document.getElementById('editTableName').value = name;
+      document.getElementById('editTableModal').style.display = 'flex';
+    }
+
+    // إغلاق النافذة إذا نقر المستخدم خارجها
+    window.onclick = function(event) {
+      if (event.target.classList.contains('modal')) {
+        event.target.style.display = 'none';
+      }
     }
   </script>
 </body>
