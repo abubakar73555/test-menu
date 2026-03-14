@@ -568,6 +568,33 @@ function renderPublicMenuHTML(res, categories, uncategorized, settings, tableNam
         font-size: 1.5rem;
       }
     }
+    /* تحسينات للجوال */
+@media (max-width: 768px) {
+  .floating-cart {
+    bottom: 15px;
+    left: 15px;
+  }
+  .cart-toggle {
+    width: 50px;
+    height: 50px;
+    font-size: 1.3rem;
+  }
+  .cart-panel {
+    width: calc(100% - 30px);
+    left: 15px;
+    right: 15px;
+    bottom: 80px;
+    max-width: none;
+  }
+  .cart-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 5px;
+  }
+  .cart-item-actions {
+    align-self: flex-end;
+  }
+}
   `;
 
   const tableMessage = tableName ? `<div class="table-badge">🪑 ${tableName}</div>` : '';
@@ -683,6 +710,38 @@ function renderPublicMenuHTML(res, categories, uncategorized, settings, tableNam
     let cart = JSON.parse(localStorage.getItem('cart')) || [];
     let currentItem = null;
 
+// تحسينات للجوال - إعادة ربط الأحداث
+document.addEventListener('DOMContentLoaded', function() {
+  // ربط زر السلة
+  const cartToggle = document.querySelector('.cart-toggle');
+  if (cartToggle) {
+    cartToggle.addEventListener('click', toggleCart);
+  }
+  
+  // ربط أزرار الإضافة
+  document.querySelectorAll('.add-to-cart-btn').forEach(btn => {
+    btn.removeEventListener('click', btnClickHandler); // إزالة أي مستمع سابق
+    btn.addEventListener('click', btnClickHandler);
+  });
+});
+
+function btnClickHandler(e) {
+  e.stopPropagation();
+  const btn = e.currentTarget;
+  const id = btn.dataset.id;
+  const name = btn.dataset.name;
+  const price = parseFloat(btn.dataset.price);
+  openOptionsModal(id, name, price);
+}
+function toggleCart() {
+  const panel = document.getElementById('cartPanel');
+  if (panel) {
+    panel.classList.toggle('show');
+    if (cart.length === 0) {
+      panel.classList.remove('show');
+    }
+  }
+}
     function updateCartCount() {
       const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
       document.getElementById('cartCount').innerText = totalItems;
