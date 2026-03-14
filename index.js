@@ -94,6 +94,14 @@ async function getFilteredRestaurants(env, url) {
 // 3. رفع الصور إلى R2
 // ==========================================
 async function handleImageUpload(request, env) {
+  // التحقق من ربط R2
+  if (!env.R2) {
+    return new Response(JSON.stringify({ error: "❌ R2 bucket not bound to the worker. Please add a binding named 'R2'." }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" }
+    });
+  }
+
   const cookie = request.headers.get("Cookie") || "";
   const isMaster = cookie.includes("auth_role=master");
   let restaurantSlug = null;
@@ -101,38 +109,59 @@ async function handleImageUpload(request, env) {
   if (match) restaurantSlug = match[1];
 
   if (!isMaster && !restaurantSlug) {
-    return new Response("Unauthorized", { status: 401 });
+    return new Response(JSON.stringify({ error: "❌ Unauthorized: You must be logged in." }), {
+      status: 401,
+      headers: { "Content-Type": "application/json" }
+    });
   }
 
   let restaurantId;
-  if (isMaster) {
-    const formData = await request.formData();
-    restaurantId = formData.get("restaurant_id");
-  } else {
-    const res = await env.DB.prepare("SELECT id FROM restaurants WHERE slug = ?").bind(restaurantSlug).first();
-    if (!res) return new Response("Restaurant not found", { status: 404 });
-    restaurantId = res.id;
+  try {
+    if (isMaster) {
+      const formData = await request.formData();
+      restaurantId = formData.get("restaurant_id");
+    } else {
+      const res = await env.DB.prepare("SELECT id FROM restaurants WHERE slug = ?").bind(restaurantSlug).first();
+      if (!res) return new Response(JSON.stringify({ error: "❌ Restaurant not found." }), { status: 404, headers: { "Content-Type": "application/json" } });
+      restaurantId = res.id;
+    }
+  } catch (dbError) {
+    return new Response(JSON.stringify({ error: "❌ Database error: " + dbError.message }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" }
+    });
   }
 
   const formData = await request.formData();
   const file = formData.get("image");
-  if (!file) return new Response("No image uploaded", { status: 400 });
+  if (!file) {
+    return new Response(JSON.stringify({ error: "❌ No image file uploaded." }), {
+      status: 400,
+      headers: { "Content-Type": "application/json" }
+    });
+  }
 
-  const bytes = await file.arrayBuffer();
-  const buffer = new Uint8Array(bytes);
+  try {
+    const bytes = await file.arrayBuffer();
+    const buffer = new Uint8Array(bytes);
 
-  const fileName = `${restaurantId}/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
+    const fileName = `${restaurantId}/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
 
-  await env.R2.put(fileName, buffer, {
-    httpMetadata: { contentType: file.type }
-  });
+    await env.R2.put(fileName, buffer, {
+      httpMetadata: { contentType: file.type }
+    });
 
-  // استبدل <your-account-hash> بالرابط الصحيح لحسابك
-  const publicUrl = `const publicUrl = `https://images.topsafetypro.com/${fileName}`; 
+    const publicUrl = `https://images.topsafetypro.com/${fileName}`;
 
-  return new Response(JSON.stringify({ url: publicUrl }), {
-    headers: { "Content-Type": "application/json" }
-  });
+    return new Response(JSON.stringify({ url: publicUrl }), {
+      headers: { "Content-Type": "application/json" }
+    });
+  } catch (r2Error) {
+    return new Response(JSON.stringify({ error: "❌ R2 upload failed: " + r2Error.message }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" }
+    });
+  }
 }
 
 // ==========================================
