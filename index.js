@@ -85,7 +85,7 @@ async function getFilteredRestaurants(env, url) {
 }
 
 // ==========================================
-// 3. رفع الصور إلى R2 (مُحسّن مع رسائل خطأ)
+// 3. رفع الصور إلى R2 (مُحسّن مع تفاصيل الخطأ)
 // ==========================================
 async function handleImageUpload(request, env) {
   // التحقق من ربط R2
@@ -138,13 +138,15 @@ async function handleImageUpload(request, env) {
     });
   }
 
-  // استخراج الملف من الطلب
+  // استخراج الملف من الطلب مع تفاصيل الخطأ
   let formData;
   try {
     formData = await request.formData();
   } catch (e) {
+    // 🟢 تم تعديل رسالة الخطأ لإظهار التفاصيل
     return new Response(JSON.stringify({ 
-      error: "❌ فشل قراءة بيانات النموذج. تأكد من إرسال البيانات بشكل صحيح." 
+      error: "❌ فشل قراءة بيانات النموذج: " + e.message,
+      stack: e.stack 
     }), {
       status: 400,
       headers: { "Content-Type": "application/json" }
@@ -189,7 +191,7 @@ async function handleImageUpload(request, env) {
     buffer = new Uint8Array(bytes);
   } catch (e) {
     return new Response(JSON.stringify({ 
-      error: "❌ فشل قراءة محتوى الصورة. يرجى المحاولة مرة أخرى." 
+      error: "❌ فشل قراءة محتوى الصورة: " + e.message 
     }), {
       status: 500,
       headers: { "Content-Type": "application/json" }
