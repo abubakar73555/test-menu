@@ -27,20 +27,46 @@ export async function getFilteredRestaurants(env, url) {
 
   const { results: restaurants } = await env.DB.prepare(query).bind(...params).all();
 
-  // إحصائيات
-  const totalCount = (await env.DB.prepare("SELECT COUNT(*) as count FROM restaurants").first()).count;
-  const activeCount = (await env.DB.prepare("SELECT COUNT(*) as count FROM restaurants WHERE expires_at >= ?").bind(today).first()).count;
+  // إحصائيات محسنة (استعلام واحد بدلاً من ثلاثة)
+  const statsQuery = await env.DB.prepare(`
+    SELECT 
+      (SELECT COUNT(*) FROM restaurants) as totalCount,
+      (SELECT COUNT(*) FROM restaurants WHERE expires_at >= ?) as activeCount,
+      (SELECT COUNT(*) FROM items) as totalItems
+  `).bind(today).first();
+  const totalCount = statsQuery.totalCount;
+  const activeCount = statsQuery.activeCount;
   const expiredCount = totalCount - activeCount;
-  const totalItems = (await env.DB.prepare("SELECT COUNT(*) as count FROM items").first()).count;
+  const totalItems = statsQuery.totalItems;
 
-  // آخر نشاط
-  for (let res of restaurants) {
-    const lastLog = await env.DB.prepare(
-      "SELECT action, timestamp FROM activity_logs WHERE restaurant_id = ? ORDER BY timestamp DESC LIMIT 1"
-    ).bind(res.id).first();
-    res.last_activity = lastLog 
-      ? `${lastLog.action} في ${new Date(lastLog.timestamp).toLocaleString('ar-EG')}` 
-      : "لا يوجد نشاط";
+  // حل N+1: جلب آخر نشاط لكل المطاعم دفعة واحدة
+  if (restaurants.length > 0) {
+    const ids = restaurants.map(r => r.id);
+    const placeholders = ids.map(() => '?').join(',');
+    const { results: lastLogs } = await env.DB.prepare(`
+      SELECT restaurant_id, action, timestamp
+      FROM activity_logs
+      WHERE (restaurant_id, timestamp) IN (
+        SELECT restaurant_id, MAX(timestamp)
+        FROM activity_logs
+        WHERE restaurant_id IN (${placeholders})
+        GROUP BY restaurant_id
+      )
+    `).bind(...ids).all();
+
+    const logMap = {};
+    lastLogs.forEach(log => { logMap[log.restaurant_id] = log; });
+
+    for (let res of restaurants) {
+      const log = logMap[res.id];
+      res.last_activity = log 
+        ? { action: log.action, timestamp: log.timestamp }
+        : null;
+    }
+  } else {
+    for (let res of restaurants) {
+      res.last_activity = null;
+    }
   }
 
   return { restaurants, totalCount, activeCount, expiredCount, totalItems };
