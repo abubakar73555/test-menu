@@ -4,8 +4,11 @@
 import { comparePassword } from './utils.js';
 import { getRestaurantBySlug } from './db.js';
 
-// عرض صفحة تسجيل الدخول
+// عرض صفحة تسجيل الدخول مع رسالة الخطأ
 export function handleLoginRoute(request, env) {
+  const url = new URL(request.url);
+  const errorMsg = url.searchParams.get('error') || '';
+
   const html = `<!DOCTYPE html>
 <html dir="rtl">
 <head>
@@ -19,26 +22,19 @@ export function handleLoginRoute(request, env) {
     input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; }
     button { width: 100%; padding: 12px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 1rem; }
     button:hover { background: #0056b3; }
-    .error { color: red; text-align: center; margin-top: 10px; }
+    .error { color: red; text-align: center; margin-top: 10px; padding: 10px; background: #ffeeee; border-radius: 5px; }
   </style>
 </head>
 <body>
   <div class="login-box">
     <h2>🔑 تسجيل الدخول</h2>
+    ${errorMsg ? `<div class="error">${errorMsg}</div>` : ''}
     <form method="POST" action="/login">
       <input type="text" name="username" placeholder="اسم المستخدم (أو slug)" required>
       <input type="password" name="password" placeholder="كلمة المرور" required>
       <button type="submit">دخول</button>
     </form>
-    <div class="error" id="error"></div>
   </div>
-  <script>
-    // عرض رسالة الخطأ إذا كانت موجودة في URL
-    const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get('error')) {
-      document.getElementById('error').innerText = urlParams.get('error');
-    }
-  </script>
 </body>
 </html>`;
   return new Response(html, { headers: { "Content-Type": "text/html; charset=utf-8" } });
@@ -50,13 +46,17 @@ export async function handleLoginSubmit(request, env) {
     const formData = await request.formData();
     const username = formData.get('username');
     const password = formData.get('password');
+    const url = new URL(request.url);
+    const origin = url.origin;
 
-    // التحقق من الماستر (يمكن وضع كلمة مرور الماستر في متغير بيئي)
-    if (username === 'master' && password === env.MASTER_PASSWORD) {
+    // التحقق من الماستر
+    // في بيئة التطوير، استخدم القيمة الافتراضية "admin123" إذا لم يتم تعيين MASTER_PASSWORD
+    const masterPassword = env.MASTER_PASSWORD || 'admin123';
+    if (username === 'master' && password === masterPassword) {
       return new Response('', {
         status: 302,
         headers: {
-          'Location': '/admin/master',
+          'Location': `${origin}/admin/master`,
           'Set-Cookie': 'auth_role=master; Path=/; HttpOnly; SameSite=Strict'
         }
       });
@@ -65,7 +65,7 @@ export async function handleLoginSubmit(request, env) {
     // التحقق من مطعم
     const restaurant = await getRestaurantBySlug(env, username);
     if (!restaurant) {
-      return Response.redirect('/?error=المطعم غير موجود', 302);
+      return Response.redirect(`${origin}/?error=المطعم غير موجود`, 302);
     }
 
     const isValid = await comparePassword(password, restaurant.admin_password);
@@ -73,12 +73,12 @@ export async function handleLoginSubmit(request, env) {
       return new Response('', {
         status: 302,
         headers: {
-          'Location': `/admin/${restaurant.slug}`,
+          'Location': `${origin}/admin/${restaurant.slug}`,
           'Set-Cookie': `auth_role=res_${restaurant.slug}; Path=/; HttpOnly; SameSite=Strict`
         }
       });
     } else {
-      return Response.redirect('/?error=كلمة المرور غير صحيحة', 302);
+      return Response.redirect(`${origin}/?error=كلمة المرور غير صحيحة`, 302);
     }
   } catch (e) {
     return new Response(e.message, { status: 500 });
