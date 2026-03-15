@@ -3,6 +3,7 @@
 // ==========================================
 import { sanitizeFileName } from './utils.js';
 import { getRestaurantBySlug } from './db.js';
+import { fileTypeFromBuffer } from 'file-type';
 
 export async function handleImageUpload(request, env) {
   if (!env.R2) {
@@ -39,6 +40,15 @@ export async function handleImageUpload(request, env) {
   try {
     if (isMaster) {
       restaurantId = formData.get("restaurant_id");
+      // تأكد من وجود المطعم
+      if (restaurantId) {
+        const exists = await env.DB.prepare("SELECT id FROM restaurants WHERE id = ?").bind(restaurantId).first();
+        if (!exists) {
+          return new Response(JSON.stringify({ error: "❌ المطعم غير موجود." }), { status: 404, headers: { "Content-Type": "application/json" } });
+        }
+      } else {
+        return new Response(JSON.stringify({ error: "❌ يجب تحديد معرف المطعم." }), { status: 400, headers: { "Content-Type": "application/json" } });
+      }
     } else {
       const res = await getRestaurantBySlug(env, restaurantSlug);
       if (!res) return new Response(JSON.stringify({ error: "❌ المطعم غير موجود." }), { status: 404, headers: { "Content-Type": "application/json" } });
@@ -59,14 +69,7 @@ export async function handleImageUpload(request, env) {
     });
   }
 
-  if (!file.type.startsWith("image/")) {
-    return new Response(JSON.stringify({ error: "❌ نوع الملف غير مدعوم." }), {
-      status: 400,
-      headers: { "Content-Type": "application/json" }
-    });
-  }
-
-  const MAX_SIZE = 5 * 1024 * 1024;
+  const MAX_SIZE = 5 * 1024 * 1024; // 5 ميجابايت
   if (file.size > MAX_SIZE) {
     return new Response(JSON.stringify({ error: "❌ حجم الصورة كبير جداً. الحد الأقصى 5 ميجابايت." }), {
       status: 400,
@@ -85,6 +88,24 @@ export async function handleImageUpload(request, env) {
     });
   }
 
+  // فحص المحتوى الفعلي للصورة
+  const type = await fileTypeFromBuffer(buffer);
+  if (!type || !type.mime.startsWith('image/')) {
+    return new Response(JSON.stringify({ error: "❌ الملف المرفوع ليس صورة صالحة." }), {
+      status: 400,
+      headers: { "Content-Type": "application/json" }
+    });
+  }
+
+  // التحقق من الامتداد المسموح به
+  const allowedMimes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+  if (!allowedMimes.includes(type.mime)) {
+    return new Response(JSON.stringify({ error: "❌ نوع الصورة غير مدعوم. الأنواع المسموحة: JPEG, PNG, WebP, GIF." }), {
+      status: 400,
+      headers: { "Content-Type": "application/json" }
+    });
+  }
+
   const safeFileName = sanitizeFileName(file.name);
   const fileName = `${restaurantId}/${Date.now()}-${safeFileName}`;
 
@@ -99,6 +120,7 @@ export async function handleImageUpload(request, env) {
     });
   }
 
+  // استخدم متغير البيئة للمجال إذا كان موجوداً
   const publicUrl = `https://images.topsafetypro.com/${fileName}`;
   return new Response(JSON.stringify({ url: publicUrl, message: "✅ تم رفع الصورة بنجاح" }), {
     headers: { "Content-Type": "application/json" }
