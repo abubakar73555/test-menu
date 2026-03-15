@@ -1,8 +1,11 @@
 // ==========================================
 // قالب إدارة خيارات الأطباق
 // ==========================================
-export function renderItemOptionsHTML(res, item, options) {
-  const rows = options.map(o => `
+
+// تم تعديل اسم الدالة إلى حروف صغيرة (renderitemoptionsHTML) 
+// ليتطابق تماماً مع الاستدعاء في ملف restaurant.js
+export function renderitemoptionsHTML(res, item, options) {
+  const rows = (options && options.length > 0) ? options.map(o => `
     <tr>
       <td>${o.option_name}</td>
       <td>${o.option_price > 0 ? o.option_price + ' ريال' : 'مجاني'}</td>
@@ -14,7 +17,7 @@ export function renderItemOptionsHTML(res, item, options) {
         </form>
       </td>
     </tr>
-  `).join('');
+  `).join('') : '<tr><td colspan="3" style="text-align:center;">لا توجد خيارات لهذه الوجبة</td></tr>';
 
   return `<!DOCTYPE html>
 <html dir="rtl">
@@ -48,7 +51,7 @@ export function renderItemOptionsHTML(res, item, options) {
   <div id="toast"></div>
   <div class="container">
     <h2>⚙️ خيارات إضافية لـ "${item.name}"</h2>
-    <p style="text-align:center; color:#666;">أضف خيارات مثل: إضافة جبنة، بدون بصل، حجم كبير... (يمكن إضافة سعر إضافي)</p>
+    <p style="text-align:center; color:#666;">أضف خيارات مثل: إضافة جبنة، بدون بصل، حجم كبير...</p>
     
     <form method="POST" class="add-form">
       <input type="hidden" name="action" value="add">
@@ -66,7 +69,7 @@ export function renderItemOptionsHTML(res, item, options) {
         </tr>
       </thead>
       <tbody>
-        ${rows || '<tr><td colspan="3" style="text-align:center;">لا توجد خيارات لهذه الوجبة</td></tr>'}
+        ${rows}
       </tbody>
     </table>
     
