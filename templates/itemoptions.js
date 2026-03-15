@@ -1,3 +1,6 @@
+// ==========================================
+// قالب إدارة خيارات الأطباق
+// ==========================================
 export function renderItemOptionsHTML(res, item, options) {
   const rows = options.map(o => `
     <tr>
