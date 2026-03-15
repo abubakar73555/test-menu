@@ -6,8 +6,7 @@ import { getRestaurantBySlug, getRestaurantSettings, getRestaurantInfo } from '.
 import { renderRestaurantHTML } from './templates/restaurant.js';
 import { renderCategoriesHTML } from './templates/categories.js';
 import { renderSettingsHTML } from './templates/settings.js';
-// تم تعديل السطر التالي ليصبح المسار والدالة بأحرف صغيرة
-import { renderitemoptionsHTML } from './templates/itemoptions.js'; 
+import { renderItemOptionsHTML } from './templates/itemoptions.js'; 
 
 // ==========================================
 // 1. لوحة تحكم المطعم (الوجبات)
@@ -306,7 +305,7 @@ export async function handleItemOptionsRoute(request, env, slug, itemId) {
     ).bind(itemId).all();
 
     // تم تعديل اسم الدالة هنا ليتوافق مع الـ Import في الأعلى
-    return new Response(renderitemoptionsHTML(res, item, options || []), {
+    return new Response(renderItemOptionsHTML(res, item, options || []), {
       headers: { "Content-Type": "text/html; charset=utf-8" }
     });
   } catch (error) {
