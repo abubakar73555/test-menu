@@ -27,7 +27,12 @@ export function renderMasterHTML(restaurants, stats, searchParams, errorMsg = ""
           <a href="/admin/${r.slug}" style="background:#007bff; color:white; padding:4px 8px; border-radius:3px; text-decoration:none; font-size:0.9rem;">إدارة</a>
           <a href="/admin/${r.slug}/categories" style="background:#28a745; color:white; padding:4px 8px; border-radius:3px; text-decoration:none; font-size:0.9rem;">الفئات</a>
           <a href="/admin/${r.slug}/settings" style="background:#17a2b8; color:white; padding:4px 8px; border-radius:3px; text-decoration:none; font-size:0.9rem;">تخصيص</a>
-          <button onclick="openEditModal(${r.id}, '${r.res_name.replace(/'/g, "\\'")}', '${r.slug}', '', '${r.expires_at}')" 
+          <button 
+            data-id="${r.id}" 
+            data-name="${r.res_name}" 
+            data-slug="${r.slug}" 
+            data-expires="${r.expires_at}"
+            onclick="openEditModal(this)" 
             style="background:orange; color:white; border:none; padding:4px 8px; border-radius:3px; cursor:pointer; font-size:0.9rem;">تعديل</button>
           <form method="POST" style="display:inline;" onsubmit="return confirm('هل أنت متأكد من الحذف؟');">
             <input type="hidden" name="action" value="delete">
@@ -171,11 +176,16 @@ export function renderMasterHTML(restaurants, stats, searchParams, errorMsg = ""
         setTimeout(() => { toast.style.display = 'none'; }, 3000);
       }
 
-      function openEditModal(id, name, slug, pass, expires) {
+      function openEditModal(btn) {
+        const id = btn.getAttribute('data-id');
+        const name = btn.getAttribute('data-name');
+        const slug = btn.getAttribute('data-slug');
+        const expires = btn.getAttribute('data-expires');
+
         document.getElementById('editId').value = id;
         document.getElementById('editResName').value = name;
         document.getElementById('editSlug').value = slug;
-        document.getElementById('editPass').value = pass;
+        document.getElementById('editPass').value = '';
         document.getElementById('editExpires').value = expires;
         document.getElementById('editModal').style.display = 'flex';
       }
@@ -191,5 +201,5 @@ export function renderMasterHTML(restaurants, stats, searchParams, errorMsg = ""
     </script>
   </div>
 </body>
-</html>\`;
+</html>`;
 }
