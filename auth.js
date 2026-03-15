@@ -57,7 +57,7 @@ export async function handleLoginSubmit(request, env) {
         status: 302,
         headers: {
           'Location': `${origin}/admin/master`,
-          'Set-Cookie': 'auth_role=master; Path=/; HttpOnly; SameSite=Strict'
+          'Set-Cookie': 'auth_role=master; Path=/; HttpOnly; SameSite=Strict; Secure; Max-Age=31536000'
         }
       });
     }
@@ -65,7 +65,7 @@ export async function handleLoginSubmit(request, env) {
     // التحقق من مطعم
     const restaurant = await getRestaurantBySlug(env, username);
     if (!restaurant) {
-      return Response.redirect(`${origin}/?error=المطعم غير موجود`, 302);
+      return Response.redirect(`${origin}/?error=${encodeURIComponent('المطعم غير موجود')}`, 302);
     }
 
     const isValid = await comparePassword(password, restaurant.admin_password);
@@ -74,11 +74,11 @@ export async function handleLoginSubmit(request, env) {
         status: 302,
         headers: {
           'Location': `${origin}/admin/${restaurant.slug}`,
-          'Set-Cookie': `auth_role=res_${restaurant.slug}; Path=/; HttpOnly; SameSite=Strict`
+          'Set-Cookie': `auth_role=res_${restaurant.slug}; Path=/; HttpOnly; SameSite=Strict; Secure; Max-Age=31536000`
         }
       });
     } else {
-      return Response.redirect(`${origin}/?error=كلمة المرور غير صحيحة`, 302);
+      return Response.redirect(`${origin}/?error=${encodeURIComponent('كلمة المرور غير صحيحة')}`, 302);
     }
   } catch (e) {
     return new Response(e.message, { status: 500 });
