@@ -2,9 +2,7 @@
 // قالب إدارة خيارات الأطباق
 // ==========================================
 
-// تم تعديل اسم الدالة إلى حروف صغيرة (renderitemoptionsHTML) 
-// ليتطابق تماماً مع الاستدعاء في ملف restaurant.js
-export function renderitemoptionsHTML(res, item, options) {
+export function renderItemOptionsHTML(res, item, options) {
   const rows = (options && options.length > 0) ? options.map(o => `
     <tr>
       <td>${o.option_name}</td>
