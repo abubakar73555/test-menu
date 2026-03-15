@@ -36,7 +36,12 @@ export async function handlePublicMenuRoute(env, slug, url) {
   `).bind(res.id).all();
 
   return new Response(renderPublicMenuHTML(res, categories, uncategorized, settings, tableName, info), {
-    headers: { "Content-Type": "text/html; charset=utf-8" }
+    headers: { 
+      "Content-Type": "text/html; charset=utf-8",
+      "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+      "Pragma": "no-cache",
+      "Expires": "0"
+    }
   });
 }
 
