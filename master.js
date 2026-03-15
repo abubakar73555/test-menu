@@ -38,6 +38,7 @@ export async function handleMasterRoute(request, env) {
       ).bind(newRes.id, 'default').run();
 
       await logActivity(env, null, "master_add_restaurant", `أضاف مطعم ${data.get("res_name")}`, request);
+      return Response.redirect(new URL("/admin/master?success=" + encodeURIComponent("تم إضافة المطعم بنجاح"), request.url));
 
     } else if (action === "edit") {
       const id = data.get("id");
@@ -54,11 +55,13 @@ export async function handleMasterRoute(request, env) {
       params.push(id);
       await env.DB.prepare(updateQuery).bind(...params).run();
       await logActivity(env, id, "master_edit_restaurant", `عدل بيانات المطعم ${data.get("res_name")}`, request);
+      return Response.redirect(new URL("/admin/master?success=" + encodeURIComponent("تم تحديث بيانات المطعم"), request.url));
 
     } else if (action === "delete") {
       const id = data.get("id");
       await env.DB.prepare("DELETE FROM restaurants WHERE id = ?").bind(id).run();
       await logActivity(env, null, "master_delete_restaurant", `حذف مطعم ID: ${id}`, request);
+      return Response.redirect(new URL("/admin/master?success=" + encodeURIComponent("تم حذف المطعم بنجاح"), request.url));
     }
 
     return Response.redirect(new URL("/admin/master", request.url));
