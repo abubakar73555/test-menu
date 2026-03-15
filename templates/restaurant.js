@@ -27,11 +27,19 @@ export function renderRestaurantHTML(res, items, categories, settings, origin, i
       </div>
       <div style="display:flex; gap:5px;">
         <button onclick="location.href='/admin/${res.slug}/item-options/${i.id}'" style="background:#17a2b8; color:white; border:none; padding:5px 10px; border-radius:3px; cursor:pointer;">⚙️ خيارات</button>
-        <button onclick="openEditItemModal(${i.id}, '${i.name.replace(/'/g, "\\'")}', ${i.price}, ${i.category_id || 'null'}, '${i.image_url || ''}', ${i.featured})" style="background:orange; color:white; border:none; padding:5px 10px; border-radius:3px;">تعديل</button>
+        <button 
+          data-id="${i.id}" 
+          data-name="${i.name}" 
+          data-price="${i.price}" 
+          data-category="${i.category_id || ''}" 
+          data-image="${i.image_url || ''}" 
+          data-featured="${i.featured}"
+          onclick="openEditItemModal(this)" 
+          style="background:orange; color:white; border:none; padding:5px 10px; border-radius:3px; cursor:pointer;">تعديل</button>
         <form method="POST" style="margin:0;" onsubmit="return confirm('حذف الوجبة؟');">
           <input type="hidden" name="action" value="delete">
           <input type="hidden" name="id" value="${i.id}">
-          <button style="background:red; color:white; border:none; padding:5px 10px; border-radius:3px;">حذف</button>
+          <button style="background:red; color:white; border:none; padding:5px 10px; border-radius:3px; cursor:pointer;">حذف</button>
         </form>
       </div>
     </li>
@@ -40,11 +48,15 @@ export function renderRestaurantHTML(res, items, categories, settings, origin, i
   const tablesHtml = tables.map(t => `
     <div style="display:flex; align-items:center; gap:5px; margin:5px; background:#f9f9f9; padding:5px; border-radius:5px; flex-wrap:wrap;">
       <span style="flex:1;">${t.table_name}</span>
-      <button onclick="editTable(${t.id}, '${t.table_name.replace(/'/g, "\\'")}')" style="background:orange; color:white; border:none; padding:2px 8px; border-radius:3px;">✏️</button>
+      <button 
+        data-id="${t.id}" 
+        data-name="${t.table_name}" 
+        onclick="editTable(this)" 
+        style="background:orange; color:white; border:none; padding:2px 8px; border-radius:3px; cursor:pointer;">✏️</button>
       <form method="POST" style="display:inline;" onsubmit="return confirm('حذف هذه الطاولة؟');">
         <input type="hidden" name="action" value="delete_table">
         <input type="hidden" name="table_id" value="${t.id}">
-        <button style="background:red; color:white; border:none; padding:2px 8px; border-radius:3px;">🗑️</button>
+        <button style="background:red; color:white; border:none; padding:2px 8px; border-radius:3px; cursor:pointer;">🗑️</button>
       </form>
       <a href="/menu/${res.slug}?table=${t.id}" target="_blank" style="background:${settings.primary_color || '#007bff'}; color:white; padding:2px 8px; border-radius:3px; text-decoration:none;">🔗</a>
       <a href="https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=${encodeURIComponent(origin + '/menu/' + res.slug + '?table=' + t.id)}" 
@@ -248,7 +260,14 @@ export function renderRestaurantHTML(res, items, categories, settings, origin, i
       }
     }
 
-    function openEditItemModal(id, name, price, categoryId, imageUrl, featured) {
+    function openEditItemModal(btn) {
+      const id = btn.getAttribute('data-id');
+      const name = btn.getAttribute('data-name');
+      const price = btn.getAttribute('data-price');
+      const categoryId = btn.getAttribute('data-category');
+      const imageUrl = btn.getAttribute('data-image');
+      const featured = btn.getAttribute('data-featured');
+
       document.getElementById('editItemId').value = id;
       document.getElementById('editItemName').value = name;
       document.getElementById('editItemPrice').value = price;
@@ -263,7 +282,9 @@ export function renderRestaurantHTML(res, items, categories, settings, origin, i
       document.getElementById('editItemModal').style.display = 'none';
     }
 
-    function editTable(id, name) {
+    function editTable(btn) {
+      const id = btn.getAttribute('data-id');
+      const name = btn.getAttribute('data-name');
       document.getElementById('editTableId').value = id;
       document.getElementById('editTableName').value = name;
       document.getElementById('editTableModal').style.display = 'flex';
