@@ -44,6 +44,7 @@ export async function handleRestaurantRoute(request, env, slug, origin) {
           "INSERT INTO items (restaurant_id, name, price, category_id, image_url, featured) VALUES (?, ?, ?, ?, ?, ?)"
         ).bind(res.id, name, price, categoryId, imageUrl, featured).run();
         await logActivity(env, res.id, "item_add", `أضاف وجبة ${name}`, request);
+        return Response.redirect(new URL(`/admin/${slug}?success=` + encodeURIComponent("تم إضافة الوجبة"), request.url));
 
       } else if (action === "edit") {
         const itemId = data.get("id");
@@ -57,11 +58,13 @@ export async function handleRestaurantRoute(request, env, slug, origin) {
           "UPDATE items SET name = ?, price = ?, category_id = ?, image_url = ?, featured = ? WHERE id = ?"
         ).bind(name, price, categoryId, imageUrl, featured, itemId).run();
         await logActivity(env, res.id, "item_edit", `عدل وجبة ${name}`, request);
+        return Response.redirect(new URL(`/admin/${slug}?success=` + encodeURIComponent("تم تحديث الوجبة"), request.url));
 
       } else if (action === "delete") {
         const itemId = data.get("id");
         await env.DB.prepare("DELETE FROM items WHERE id = ?").bind(itemId).run();
         await logActivity(env, res.id, "item_delete", `حذف وجبة ID: ${itemId}`, request);
+        return Response.redirect(new URL(`/admin/${slug}?success=` + encodeURIComponent("تم حذف الوجبة"), request.url));
       }
 
       // إجراءات الطاولات
@@ -71,6 +74,7 @@ export async function handleRestaurantRoute(request, env, slug, origin) {
           "INSERT INTO tables (restaurant_id, table_name) VALUES (?, ?)"
         ).bind(res.id, tableName).run();
         await logActivity(env, res.id, "table_add", `أضاف طاولة ${tableName}`, request);
+        return Response.redirect(new URL(`/admin/${slug}?success=` + encodeURIComponent("تم إضافة الطاولة"), request.url));
 
       } else if (action === "edit_table") {
         const tableId = data.get("table_id");
@@ -79,6 +83,7 @@ export async function handleRestaurantRoute(request, env, slug, origin) {
           "UPDATE tables SET table_name = ? WHERE id = ? AND restaurant_id = ?"
         ).bind(tableName, tableId, res.id).run();
         await logActivity(env, res.id, "table_edit", `عدل اسم طاولة إلى ${tableName}`, request);
+        return Response.redirect(new URL(`/admin/${slug}?success=` + encodeURIComponent("تم تحديث اسم الطاولة"), request.url));
 
       } else if (action === "delete_table") {
         const tableId = data.get("table_id");
@@ -86,6 +91,7 @@ export async function handleRestaurantRoute(request, env, slug, origin) {
           "DELETE FROM tables WHERE id = ? AND restaurant_id = ?"
         ).bind(tableId, res.id).run();
         await logActivity(env, res.id, "table_delete", `حذف طاولة`, request);
+        return Response.redirect(new URL(`/admin/${slug}?success=` + encodeURIComponent("تم حذف الطاولة"), request.url));
       }
 
       return Response.redirect(new URL(`/admin/${slug}`, request.url));
@@ -162,15 +168,18 @@ export async function handleCategoriesRoute(request, env, slug) {
           "INSERT INTO categories (restaurant_id, name, sort_order) VALUES (?, ?, ?)"
         ).bind(res.id, name, 0).run();
         await logActivity(env, res.id, "category_add", `أضاف فئة ${name}`, request);
+        return Response.redirect(new URL(`/admin/${slug}/categories?success=` + encodeURIComponent("تم إضافة الفئة"), request.url));
       } else if (action === "delete") {
         const catId = data.get("id");
         await env.DB.prepare("DELETE FROM categories WHERE id = ?").bind(catId).run();
         await logActivity(env, res.id, "category_delete", `حذف فئة ID: ${catId}`, request);
+        return Response.redirect(new URL(`/admin/${slug}/categories?success=` + encodeURIComponent("تم حذف الفئة"), request.url));
       } else if (action === "edit") {
         const catId = data.get("id");
         const name = data.get("name");
         await env.DB.prepare("UPDATE categories SET name = ? WHERE id = ?").bind(name, catId).run();
         await logActivity(env, res.id, "category_edit", `عدل فئة إلى ${name}`, request);
+        return Response.redirect(new URL(`/admin/${slug}/categories?success=` + encodeURIComponent("تم تحديث الفئة"), request.url));
       }
 
       return Response.redirect(new URL(`/admin/${slug}/categories`, request.url));
@@ -250,7 +259,7 @@ export async function handleSettingsRoute(request, env, slug) {
       `).bind(res.id, phone, whatsapp, address, map_url, working_hours, facebook, instagram, number_of_tables).run();
 
       await logActivity(env, res.id, "settings_update", `حدث الإعدادات`, request);
-      return Response.redirect(new URL(`/admin/${slug}/settings`, request.url));
+      return Response.redirect(new URL(`/admin/${slug}/settings?success=` + encodeURIComponent("تم حفظ الإعدادات بنجاح"), request.url));
     }
 
     const settings = await getRestaurantSettings(env, res.id);
@@ -291,10 +300,12 @@ export async function handleItemOptionsRoute(request, env, slug, itemId) {
           "INSERT INTO item_options (item_id, option_name, option_price) VALUES (?, ?, ?)"
         ).bind(itemId, optionName, optionPrice).run();
         await logActivity(env, res.id, "option_add", `أضاف خيار ${optionName} لوجبة ${item.name}`, request);
+        return Response.redirect(new URL(`/admin/${slug}/item-options/${itemId}?success=` + encodeURIComponent("تم إضافة الخيار بنجاح"), request.url));
       } else if (action === "delete") {
         const optionId = data.get("option_id");
         await env.DB.prepare("DELETE FROM item_options WHERE id = ?").bind(optionId).run();
         await logActivity(env, res.id, "option_delete", `حذف خيار من وجبة ${item.name}`, request);
+        return Response.redirect(new URL(`/admin/${slug}/item-options/${itemId}?success=` + encodeURIComponent("تم حذف الخيار"), request.url));
       }
 
       return Response.redirect(new URL(`/admin/${slug}/item-options/${itemId}`, request.url));
