@@ -6,7 +6,7 @@ import { getRestaurantBySlug, getRestaurantSettings, getRestaurantInfo } from '.
 import { renderRestaurantHTML } from './templates/restaurant.js';
 import { renderCategoriesHTML } from './templates/categories.js';
 import { renderSettingsHTML } from './templates/settings.js';
-import { renderItemOptionsHTML } from './templates/itemoptions.js';
+import { renderitemoptionsHTML } from './templates/itemoptions.js';
 
 // ==========================================
 // 1. لوحة تحكم المطعم (الوجبات)
