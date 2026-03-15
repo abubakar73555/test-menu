@@ -1,6 +1,8 @@
 // ==========================================
 // قالب صفحة الماستر
 // ==========================================
+import { formatDateForDisplay } from '../utils.js';
+
 export function renderMasterHTML(restaurants, stats, searchParams, errorMsg = "") {
   const today = new Date().toISOString().split('T')[0];
   const expiredCount = restaurants.filter(r => r.expires_at < today).length;
@@ -189,14 +191,5 @@ export function renderMasterHTML(restaurants, stats, searchParams, errorMsg = ""
     </script>
   </div>
 </body>
-</html>`;
-}
-
-function formatDateForDisplay(isoString) {
-  if (!isoString) return '';
-  const d = new Date(isoString);
-  return d.toLocaleString('ar-EG', {
-    year: 'numeric', month: 'numeric', day: 'numeric',
-    hour: '2-digit', minute: '2-digit'
-  });
+</html>\`;
 }
