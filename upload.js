@@ -69,9 +69,9 @@ export async function handleImageUpload(request, env) {
     });
   }
 
-  const MAX_SIZE = 5 * 1024 * 1024; // 5 ميجابايت
+  const MAX_SIZE = 2 * 1024 * 1024; // 2 ميجابايت كما طلب المستخدم
   if (file.size > MAX_SIZE) {
-    return new Response(JSON.stringify({ error: "❌ حجم الصورة كبير جداً. الحد الأقصى 5 ميجابايت." }), {
+    return new Response(JSON.stringify({ error: "❌ حجم الصورة كبير جداً. الحد الأقصى 2 ميجابايت." }), {
       status: 400,
       headers: { "Content-Type": "application/json" }
     });
@@ -90,24 +90,18 @@ export async function handleImageUpload(request, env) {
 
   // فحص المحتوى الفعلي للصورة
   const type = await fileTypeFromBuffer(buffer);
-  if (!type || !type.mime.startsWith('image/')) {
-    return new Response(JSON.stringify({ error: "❌ الملف المرفوع ليس صورة صالحة." }), {
+  const allowedMimeTypes = ['image/webp', 'image/jpeg', 'image/png'];
+  
+  if (!type || !allowedMimeTypes.includes(type.mime)) {
+    return new Response(JSON.stringify({ error: "❌ صيغة الملف غير مدعومة. المسموح: WebP, JPG, PNG فقط." }), {
       status: 400,
       headers: { "Content-Type": "application/json" }
     });
   }
 
-  // التحقق من الامتداد المسموح به
-  const allowedMimes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
-  if (!allowedMimes.includes(type.mime)) {
-    return new Response(JSON.stringify({ error: "❌ نوع الصورة غير مدعوم. الأنواع المسموحة: JPEG, PNG, WebP, GIF." }), {
-      status: 400,
-      headers: { "Content-Type": "application/json" }
-    });
-  }
-
-  const safeFileName = sanitizeFileName(file.name);
-  const fileName = `${restaurantId}/${Date.now()}-${safeFileName}`;
+  // استخدام اسم ملف آمن بامتداد .webp دائماً
+  const fileName = `res_${restaurantId}_${Date.now()}.webp`;
+  const sanitizedName = sanitizeFileName(fileName);
 
   try {
     await env.R2.put(fileName, buffer, {
