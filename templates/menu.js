@@ -163,6 +163,7 @@ export function renderPublicMenuHTML(res, categories, uncategorized, settings, t
     .option-item { margin: 15px 0; padding: 10px; background: #f9f9f9; border-radius: 10px; }
     .modal-actions { display: flex; gap: 10px; margin-top: 20px; }
     .modal-actions button { flex: 1; padding: 12px; border: none; border-radius: 10px; cursor: pointer; font-weight: 600; }
+    .modal-total { font-size: 1.2rem; font-weight: 700; color: var(--primary); margin-top: 15px; text-align: center; }
     #toast { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: #333; color: white; padding: 10px 20px; border-radius: 5px; display: none; z-index: 9999; }
     @media (max-width: 768px) {
       .restaurant-name { font-size: 2rem; }
@@ -276,6 +277,7 @@ export function renderPublicMenuHTML(res, categories, uncategorized, settings, t
     <div class="modal-content">
       <h2 class="modal-title" id="modalItemName"></h2>
       <div id="modalOptions"></div>
+      <div class="modal-total" id="modalTotalPrice"></div>
       <textarea id="modalNote" placeholder="📝 ملاحظات إضافية (مثل: درجة الاستواء، بدون بصل...)" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:10px; margin:10px 0;"></textarea>
       <div class="modal-actions">
         <button onclick="closeModal()" style="background:#6c757d; color:white;">إلغاء</button>
@@ -340,15 +342,15 @@ export function renderPublicMenuHTML(res, categories, uncategorized, settings, t
         
         if (options.length > 0) {
           options.forEach(opt => {
-            optionsHtml += \`
+            optionsHtml += `
               <div class="option-item">
-                <label style="display:flex; align-items:center; gap:10px;">
-                  <input type="checkbox" class="option-checkbox" data-id="\${opt.id}" data-name="\${opt.option_name}" data-price="\${opt.option_price}">
-                  <span>\${opt.option_name}</span>
-                  \${opt.option_price > 0 ? '<span style="color:green;">(+' + opt.option_price + ' ريال)</span>' : ''}
+                <label style="display:flex; align-items:center; gap:10px; cursor:pointer;">
+                  <input type="checkbox" class="option-checkbox" data-id="${opt.id}" data-name="${opt.option_name}" data-price="${opt.option_price}" onchange="updateModalTotal()">
+                  <span>${opt.option_name}</span>
+                  ${opt.option_price > 0 ? '<span style="color:green;">(+' + opt.option_price + ' ريال)</span>' : ''}
                 </label>
               </div>
-            \`;
+            `;
           });
         } else {
           optionsHtml += '<p style="color:#666;">لا توجد خيارات إضافية لهذه الوجبة</p>';
@@ -358,9 +360,19 @@ export function renderPublicMenuHTML(res, categories, uncategorized, settings, t
         document.getElementById('optionsModal').classList.add('show');
         
         currentItem = { id, name, basePrice: price };
+        updateModalTotal();
       } catch (err) {
         showToast('حدث خطأ أثناء جلب الخيارات', 'error');
       }
+    }
+
+    function updateModalTotal() {
+      if (!currentItem) return;
+      let total = currentItem.basePrice;
+      document.querySelectorAll('.option-checkbox:checked').forEach(cb => {
+        total += parseFloat(cb.dataset.price || 0);
+      });
+      document.getElementById('modalTotalPrice').innerText = 'السعر الإجمالي: ' + total + ' ريال';
     }
 
     function closeModal() {
