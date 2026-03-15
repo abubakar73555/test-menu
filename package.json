@@ -1,0 +1,14 @@
+{
+  "name": "menu-project",
+  "version": "1.0.0",
+  "description": "مشروع منيو مطاعم على Cloudflare Workers",
+  "main": "index.js",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "file-type": "^18.7.0"
+  }
+}
