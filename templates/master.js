@@ -18,30 +18,31 @@ export function renderMasterHTML(restaurants, stats, searchParams, errorMsg = ""
       ? (r.last_activity.action + ' في ' + formatDateForDisplay(r.last_activity.timestamp))
       : 'لا يوجد نشاط';
 
-    return '<tr style="' + rowStyle + '">' +
-      '<td style="padding:10px; border-bottom:1px solid #eee;">' + r.res_name + '</td>' +
-      '<td style="padding:10px; border-bottom:1px solid #eee;">' + r.expires_at + '</td>' +
-      '<td style="padding:10px; border-bottom:1px solid #eee;">' + lastActivity + '</td>' +
-      '<td style="padding:10px; border-bottom:1px solid #eee;">' +
-        '<div style="display:flex; flex-wrap:wrap; gap:5px; justify-content:center;">' +
-          '<a href="/admin/' + r.slug + '" style="background:#007bff; color:white; padding:4px 8px; border-radius:3px; text-decoration:none; font-size:0.9rem;">إدارة</a>' +
-          '<a href="/admin/' + r.slug + '/categories" style="background:#28a745; color:white; padding:4px 8px; border-radius:3px; text-decoration:none; font-size:0.9rem;">الفئات</a>' +
-          '<a href="/admin/' + r.slug + '/settings" style="background:#17a2b8; color:white; padding:4px 8px; border-radius:3px; text-decoration:none; font-size:0.9rem;">تخصيص</a>' +
-          '<button ' +
-            'data-id="' + r.id + '" ' +
-            'data-name="' + r.res_name + '" ' +
-            'data-slug="' + r.slug + '" ' +
-            'data-expires="' + r.expires_at + '" ' +
-            'onclick="openEditModal(this)" ' +
-            'style="background:orange; color:white; border:none; padding:4px 8px; border-radius:3px; cursor:pointer; font-size:0.9rem;">تعديل</button>' +
-          '<form method="POST" style="display:inline;" onsubmit="return confirm(\'هل أنت متأكد من الحذف؟\');">' +
-            '<input type="hidden" name="action" value="delete">' +
-            '<input type="hidden" name="id" value="' + r.id + '">' +
-            '<button style="background:red; color:white; border:none; padding:4px 8px; border-radius:3px; cursor:pointer; font-size:0.9rem;">حذف</button>' +
-          '</form>' +
-        '</div>' +
-      '</td>' +
-    '</tr>';
+    let row = '<tr style="' + rowStyle + '">';
+    row += '<td style="padding:10px; border-bottom:1px solid #eee;">' + r.res_name + '</td>';
+    row += '<td style="padding:10px; border-bottom:1px solid #eee;">' + r.expires_at + '</td>';
+    row += '<td style="padding:10px; border-bottom:1px solid #eee;">' + lastActivity + '</td>';
+    row += '<td style="padding:10px; border-bottom:1px solid #eee;">';
+    row += '<div style="display:flex; flex-wrap:wrap; gap:5px; justify-content:center;">';
+    row += '<a href="/admin/' + r.slug + '" style="background:#007bff; color:white; padding:4px 8px; border-radius:3px; text-decoration:none; font-size:0.9rem;">إدارة</a>';
+    row += '<a href="/admin/' + r.slug + '/categories" style="background:#28a745; color:white; padding:4px 8px; border-radius:3px; text-decoration:none; font-size:0.9rem;">الفئات</a>';
+    row += '<a href="/admin/' + r.slug + '/settings" style="background:#17a2b8; color:white; padding:4px 8px; border-radius:3px; text-decoration:none; font-size:0.9rem;">تخصيص</a>';
+    row += '<button ';
+    row += 'data-id="' + r.id + '" ';
+    row += 'data-name="' + r.res_name + '" ';
+    row += 'data-slug="' + r.slug + '" ';
+    row += 'data-expires="' + r.expires_at + '" ';
+    row += 'onclick="openEditModal(this)" ';
+    row += 'style="background:orange; color:white; border:none; padding:4px 8px; border-radius:3px; cursor:pointer; font-size:0.9rem;">تعديل</button>';
+    row += '<form method="POST" style="display:inline;" onsubmit="return confirm(\'هل أنت متأكد من الحذف؟\');">';
+    row += '<input type="hidden" name="action" value="delete">';
+    row += '<input type="hidden" name="id" value="' + r.id + '">';
+    row += '<button style="background:red; color:white; border:none; padding:4px 8px; border-radius:3px; cursor:pointer; font-size:0.9rem;">حذف</button>';
+    row += '</form>';
+    row += '</div>';
+    row += '</td>';
+    row += '</tr>';
+    return row;
   }).join('');
 
   const searchParam = searchParams ? (searchParams.get("search") || "") : "";
@@ -168,12 +169,12 @@ export function renderMasterHTML(restaurants, stats, searchParams, errorMsg = ""
   html += '    </div>';
 
   html += '    <script>';
-  html += '      function showToast(message, type = "success") {';
+  html += '      function showToast(message, type) {';
   html += '        const toast = document.getElementById("toast");';
   html += '        toast.style.backgroundColor = type === "success" ? "#28a745" : "#dc3545";';
   html += '        toast.innerText = message;';
   html += '        toast.style.display = "block";';
-  html += '        setTimeout(() => { toast.style.display = "none"; }, 3000);';
+  html += '        setTimeout(function() { toast.style.display = "none"; }, 3000);';
   html += '      }';
 
   html += '      function openEditModal(btn) {';
