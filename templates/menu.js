@@ -527,18 +527,24 @@ export function renderPublicMenuHTML(res, categories, uncategorized, settings, t
     const searchInput = document.getElementById('searchInput');
     if (searchInput) {
       searchInput.addEventListener('input', function() {
-        setTimeout(function() {
-          document.querySelectorAll('.add-to-cart-btn').forEach(btn => {
-            btn.addEventListener('click', function(e) {
-              e.preventDefault();
-              e.stopPropagation();
-              const id = this.dataset.id;
-              const name = this.dataset.name;
-              const price = parseFloat(this.dataset.price);
-              openOptionsModal(id, name, price);
-            });
-          });
-        }, 100);
+        const query = this.value.toLowerCase();
+        document.querySelectorAll('.item-card').forEach(card => {
+          const name = card.querySelector('.item-name').innerText.toLowerCase();
+          if (name.includes(query)) {
+            card.style.display = 'block';
+          } else {
+            card.style.display = 'none';
+          }
+        });
+        
+        // إخفاء الفئات التي لا تحتوي على وجبات مطابقة
+        document.querySelectorAll('.category-section').forEach(section => {
+          const visibleItems = section.querySelectorAll('.item-card[style="display: block;"]').length;
+          const totalItems = section.querySelectorAll('.item-card').length;
+          // إذا لم يتم تعيين style.display، فهو افتراضياً block
+          const hasVisible = Array.from(section.querySelectorAll('.item-card')).some(card => card.style.display !== 'none');
+          section.style.display = hasVisible ? 'block' : 'none';
+        });
       });
     }
 
