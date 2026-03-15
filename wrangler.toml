@@ -16,4 +16,4 @@ bucket_name = "menu-images"
 
 # متغيرات البيئة
 [vars]
-MASTER_PASSWORD = "your_secure_master_password"
+MASTER_PASSWORD = "admin123"
