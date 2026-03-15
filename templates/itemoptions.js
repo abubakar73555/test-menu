@@ -8,7 +8,7 @@ export function renderItemOptionsHTML(res, item, options) {
       <td>${o.option_name}</td>
       <td>${o.option_price > 0 ? o.option_price + ' ريال' : 'مجاني'}</td>
       <td>
-        <form method="POST" style="display:inline;" onsubmit="return confirm('حذف هذا الخيار؟');">
+        <form method="POST" style="display:inline;" onsubmit="event.preventDefault(); deleteOption(this);">
           <input type="hidden" name="action" value="delete">
           <input type="hidden" name="option_id" value="${o.id}">
           <button style="background:red; color:white; border:none; padding:5px 10px; border-radius:3px; cursor:pointer;">حذف</button>
@@ -51,7 +51,7 @@ export function renderItemOptionsHTML(res, item, options) {
     <h2>⚙️ خيارات إضافية لـ "${item.name}"</h2>
     <p style="text-align:center; color:#666;">أضف خيارات مثل: إضافة جبنة، بدون بصل، حجم كبير...</p>
     
-    <form method="POST" class="add-form">
+    <form method="POST" class="add-form" onsubmit="event.preventDefault(); addOption(this);">
       <input type="hidden" name="action" value="add">
       <input type="text" name="option_name" placeholder="اسم الخيار (مثال: إضافة جبنة)" required>
       <input type="number" name="option_price" placeholder="السعر الإضافي" step="0.01" min="0" value="0">
@@ -66,7 +66,7 @@ export function renderItemOptionsHTML(res, item, options) {
           <th>الإجراء</th>
         </tr>
       </thead>
-      <tbody>
+      <tbody id="optionsTableBody">
         ${rows}
       </tbody>
     </table>
@@ -81,6 +81,55 @@ export function renderItemOptionsHTML(res, item, options) {
       toast.innerText = message;
       toast.style.display = 'block';
       setTimeout(() => { toast.style.display = 'none'; }, 3000);
+    }
+
+    async function addOption(form) {
+      const formData = new FormData(form);
+      const submitBtn = form.querySelector('button[type="submit"]');
+      submitBtn.disabled = true;
+      
+      try {
+        const response = await fetch(window.location.href, {
+          method: 'POST',
+          body: formData
+        });
+        
+        if (response.redirected) {
+          // جلب البيانات المحدثة وعرضها بدون إعادة تحميل الصفحة بالكامل
+          const html = await fetch(window.location.href).then(res => res.text());
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(html, 'text/html');
+          document.getElementById('optionsTableBody').innerHTML = doc.getElementById('optionsTableBody').innerHTML;
+          form.reset();
+          showToast('تمت الإضافة بنجاح');
+        }
+      } catch (err) {
+        showToast('حدث خطأ', 'error');
+      } finally {
+        submitBtn.disabled = false;
+      }
+    }
+
+    async function deleteOption(form) {
+      if (!confirm('حذف هذا الخيار؟')) return;
+      const formData = new FormData(form);
+      
+      try {
+        const response = await fetch(window.location.href, {
+          method: 'POST',
+          body: formData
+        });
+        
+        if (response.redirected) {
+          const html = await fetch(window.location.href).then(res => res.text());
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(html, 'text/html');
+          document.getElementById('optionsTableBody').innerHTML = doc.getElementById('optionsTableBody').innerHTML;
+          showToast('تم الحذف بنجاح');
+        }
+      } catch (err) {
+        showToast('حدث خطأ', 'error');
+      }
     }
 
     window.onload = function() {
