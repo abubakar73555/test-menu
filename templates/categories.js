@@ -7,11 +7,15 @@ export function renderCategoriesHTML(res, categories) {
       <td data-label="اسم الفئة">${c.name}</td>
       <td data-label="الإجراءات">
         <div style="display:flex; gap:5px; flex-wrap:wrap;">
-          <button onclick="openEditCatModal(${c.id}, '${c.name.replace(/'/g, "\\'")}')" style="background:orange; color:white; border:none; padding:5px 10px; border-radius:3px;">تعديل</button>
+          <button 
+            data-id="${c.id}" 
+            data-name="${c.name}"
+            onclick="openEditCatModal(this)" 
+            style="background:orange; color:white; border:none; padding:5px 10px; border-radius:3px; cursor:pointer;">تعديل</button>
           <form method="POST" style="display:inline;" onsubmit="return confirm('سيتم إزالة الفئة من الوجبات المرتبطة. استمر؟');">
             <input type="hidden" name="action" value="delete">
             <input type="hidden" name="id" value="${c.id}">
-            <button style="background:red; color:white; border:none; padding:5px 10px; border-radius:3px;">حذف</button>
+            <button style="background:red; color:white; border:none; padding:5px 10px; border-radius:3px; cursor:pointer;">حذف</button>
           </form>
         </div>
       </td>
@@ -94,7 +98,9 @@ export function renderCategoriesHTML(res, categories) {
       setTimeout(() => { toast.style.display = 'none'; }, 3000);
     }
 
-    function openEditCatModal(id, name) {
+    function openEditCatModal(btn) {
+      const id = btn.getAttribute('data-id');
+      const name = btn.getAttribute('data-name');
       document.getElementById('editCatId').value = id;
       document.getElementById('editCatName').value = name;
       document.getElementById('editCatModal').style.display = 'flex';
