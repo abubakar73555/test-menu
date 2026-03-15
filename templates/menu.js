@@ -498,20 +498,20 @@ export function renderPublicMenuHTML(res, categories, uncategorized, settings, t
       if (!phone) return showToast('رقم واتساب المطعم غير مضبوط', 'error');
 
       // --- بناء الفاتورة الرقمية ---
-      let orderText = '🧾 *فاتورة طلب جديدة*\\n';
+      let orderText = ' *فاتورة طلب جديدة*\\n';
       orderText += '------------------------------\\n';
       
       // قسم بيانات العميل
-      orderText += '👤 *بيانات العميل:*\\n';
+      orderText += ' *بيانات العميل:*\\n';
       const customerName = prompt('يرجى إدخال اسمك (اختياري):') || 'عميل خارجي';
       orderText += '• الاسم: ' + customerName + '\\n';
       if ("${tableName}") {
-        orderText += '🪑 *رقم الطاولة:* ' + "${tableName}" + '\\n';
+        orderText += ' *رقم الطاولة:* ' + "${tableName}" + '\\n';
       }
       orderText += '------------------------------\\n\\n';
 
       // قسم الأصناف
-      orderText += '🍕 *الأصناف المطلوبة:*\\n';
+      orderText += ' *الأصناف المطلوبة:*\\n';
       let total = 0;
       
       cart.forEach((item, index) => {
@@ -519,26 +519,26 @@ export function renderPublicMenuHTML(res, categories, uncategorized, settings, t
         orderText += '   الكمية: ' + item.quantity + ' | السعر: ' + item.basePrice + ' ريال\\n';
         
         if (item.options && item.options.length > 0) {
-          orderText += '   ➕ *الإضافات:*\\n';
+          orderText += '    *الإضافات:*\\n';
           item.options.forEach(opt => {
             orderText += '      ▫️ ' + opt.name + ' (+' + opt.price + ' ريال)\\n';
           });
         }
         
         if (item.note) {
-          orderText += '   📝 *ملاحظة:* ' + item.note + '\\n';
+          orderText += '    *ملاحظة:* ' + item.note + '\\n';
         }
         
         const itemTotal = item.totalPrice * item.quantity;
-        orderText += '   💰 *المجموع الفرعي:* ' + itemTotal + ' ريال\\n\\n';
+        orderText += '    *المجموع الفرعي:* ' + itemTotal + ' ريال\\n\\n';
         total += itemTotal;
       });
 
       // قسم الإجمالي النهائي
       orderText += '------------------------------\\n';
-      orderText += '💰 *الإجمالي النهائي: ' + total + ' ريال*\\n';
+      orderText += ' *الإجمالي النهائي: ' + total + ' ريال*\\n';
       orderText += '------------------------------\\n';
-      orderText += '📱 تم الطلب عبر المنيو الرقمي';
+      orderText += ' تم الطلب عبر المنيو الرقمي';
 
       const finalUrl = 'https://wa.me/' + phone + '?text=' + encodeURIComponent(orderText);
       window.open(finalUrl, '_blank');
