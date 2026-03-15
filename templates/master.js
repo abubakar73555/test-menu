@@ -1,7 +1,6 @@
 // ==========================================
 // قالب صفحة الماستر
 // ==========================================
-import { formatdatefordisplay } from '../utils.js';
 export function renderMasterHTML(restaurants, stats, searchParams, errorMsg = "") {
   const today = new Date().toISOString().split('T')[0];
   const expiredCount = restaurants.filter(r => r.expires_at < today).length;
