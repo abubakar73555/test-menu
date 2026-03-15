@@ -1,6 +1,7 @@
 name = "test-menu"
 main = "index.js"
 compatibility_date = "2024-03-01"
+compatibility_flags = [ "nodejs_compat" ]   # <-- أضف هذا السطر
 
 # ربط D1
 [[d1_databases]]
@@ -12,3 +13,7 @@ database_id = "81107e96-c3f0-4470-b6b9-35cb6c6a2311"
 [[r2_buckets]]
 binding = "R2"
 bucket_name = "menu-images"
+
+# متغيرات البيئة
+[vars]
+MASTER_PASSWORD = "your_secure_master_password"
