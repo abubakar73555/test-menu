@@ -76,6 +76,8 @@ export function renderRestaurantHTML(res, items, categories, settings, origin, i
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>إدارة ${res.res_name}</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
   <style>
     * { box-sizing: border-box; }
     body { font-family: ${settings.font_family || 'Tahoma'}, Tahoma, Arial; padding: 15px; background: #f8f9fa; margin:0; }
@@ -92,6 +94,10 @@ export function renderRestaurantHTML(res, items, categories, settings, origin, i
     .modal-content { background: white; padding: 20px; border-radius: 10px; width: 90%; max-width: 500px; max-height: 80vh; overflow-y: auto; }
     .logout-btn { background: #6c757d; color: white; border: none; padding: 12px; border-radius: 5px; cursor: pointer; width: 100%; margin-top: 20px; }
     #toast { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: #333; color: white; padding: 10px 20px; border-radius: 5px; display: none; z-index: 9999; }
+    .cropper-container { max-width: 100%; max-height: 400px; margin-bottom: 20px; }
+    #cropModal .modal-content { max-width: 600px; }
+    .preview-container { text-align: center; margin: 10px 0; }
+    #imagePreview { max-width: 200px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
     @media (max-width: 600px) {
       .header { flex-direction: column; align-items: start; }
       .qr-img { align-self: center; }
@@ -123,13 +129,35 @@ export function renderRestaurantHTML(res, items, categories, settings, origin, i
           <option value="">بدون فئة</option>
           ${catOptions}
         </select>
-        <input type="file" name="image" accept="image/*" id="imageInput">
+        <input type="file" name="image" accept="image/webp,image/jpeg,image/png" id="imageInput" onchange="handleFileSelect(this)">
+        <div class="preview-container" id="addPreviewContainer" style="display:none;">
+          <img id="imagePreview">
+          <button type="button" onclick="openCropModal('add')" style="background:orange; color:white; border:none; padding:5px 10px; border-radius:5px; margin-top:5px; cursor:pointer;">✂️ تعديل القص</button>
+        </div>
         <label style="display:flex; align-items:center; gap:5px;">
           <input type="checkbox" name="featured" value="1"> ⭐ وجبة مميزة
         </label>
+        <input type="hidden" name="image_blob" id="imageBlob">
         <input type="hidden" name="image_url" id="imageUrl">
         <button type="submit" style="background:#28a745; color:white;">إضافة</button>
       </form>
+    </div>
+
+    <div id="cropModal" class="modal">
+      <div class="modal-content">
+        <h3>✂️ قص الصورة</h3>
+        <div class="cropper-container">
+          <img id="cropperImage" style="max-width:100%;">
+        </div>
+        <div style="display:flex; gap:10px; justify-content:center; margin-top:15px;">
+          <button type="button" onclick="setAspectRatio(1)" style="padding:5px 10px;">1:1 (مربع)</button>
+          <button type="button" onclick="setAspectRatio(4/3)" style="padding:5px 10px;">4:3</button>
+        </div>
+        <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:20px;">
+          <button type="button" onclick="closeCropModal()" style="background:#6c757d; color:white; border:none; padding:8px 15px; border-radius:5px;">إلغاء</button>
+          <button type="button" onclick="applyCrop()" style="background:#28a745; color:white; border:none; padding:8px 15px; border-radius:5px;">تم القص</button>
+        </div>
+      </div>
     </div>
 
     <div class="qr-tables">
@@ -179,10 +207,15 @@ export function renderRestaurantHTML(res, items, categories, settings, origin, i
           <label>الصورة الحالية:</label>
           <img id="editItemImagePreview" style="max-width:100%; max-height:150px; margin:10px 0;">
           <label>تغيير الصورة:</label>
-          <input type="file" name="image" accept="image/*" id="editImageInput">
+          <input type="file" name="image" accept="image/webp,image/jpeg,image/png" id="editImageInput" onchange="handleFileSelect(this, 'edit')">
+          <div class="preview-container" id="editPreviewContainer" style="display:none;">
+            <img id="editImagePreviewNew">
+            <button type="button" onclick="openCropModal('edit')" style="background:orange; color:white; border:none; padding:5px 10px; border-radius:5px; margin-top:5px; cursor:pointer;">✂️ تعديل القص</button>
+          </div>
           <label style="display:flex; align-items:center; gap:5px;">
             <input type="checkbox" name="featured" id="editFeatured" value="1"> ⭐ وجبة مميزة
           </label>
+          <input type="hidden" name="image_blob" id="editImageBlob">
           <input type="hidden" name="image_url" id="editImageUrl">
           <div style="display:flex; gap:10px; margin-top:15px;">
             <button type="button" onclick="closeEditModal()" style="flex:1; background:#6c757d; color:white; padding:10px;">إلغاء</button>
@@ -196,6 +229,78 @@ export function renderRestaurantHTML(res, items, categories, settings, origin, i
   </div>
 
   <script>
+    let cropper = null;
+    let currentMode = 'add'; // 'add' or 'edit'
+
+    function handleFileSelect(input, mode = 'add') {
+      currentMode = mode;
+      const file = input.files[0];
+      if (!file) return;
+
+      if (file.size > 2 * 1024 * 1024) {
+        showToast('❌ حجم الصورة كبير جداً. الحد الأقصى 2 ميجابايت.', 'error');
+        input.value = '';
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const cropperImg = document.getElementById('cropperImage');
+        cropperImg.src = e.target.result;
+        openCropModal(mode);
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function openCropModal(mode) {
+      currentMode = mode;
+      document.getElementById('cropModal').style.display = 'flex';
+      const image = document.getElementById('cropperImage');
+      
+      if (cropper) cropper.destroy();
+      
+      cropper = new Cropper(image, {
+        aspectRatio: 1,
+        viewMode: 1,
+        autoCropArea: 1,
+      });
+    }
+
+    function setAspectRatio(ratio) {
+      if (cropper) cropper.setAspectRatio(ratio);
+    }
+
+    function closeCropModal() {
+      document.getElementById('cropModal').style.display = 'none';
+      if (cropper) cropper.destroy();
+    }
+
+    function applyCrop() {
+      if (!cropper) return;
+      
+      const canvas = cropper.getCroppedCanvas({
+        width: 800, // الحد الأقصى للعرض كما طلب المستخدم
+        imageSmoothingEnabled: true,
+        imageSmoothingQuality: 'high',
+      });
+
+      canvas.toBlob((blob) => {
+        const url = URL.createObjectURL(blob);
+        if (currentMode === 'add') {
+          document.getElementById('imagePreview').src = url;
+          document.getElementById('addPreviewContainer').style.display = 'block';
+          // سنقوم بتخزين الـ blob لإرساله لاحقاً
+          window.lastBlobAdd = blob;
+        } else {
+          document.getElementById('editImagePreviewNew').src = url;
+          document.getElementById('editImagePreviewNew').style.maxWidth = '100px';
+          document.getElementById('editPreviewContainer').style.display = 'block';
+          window.lastBlobEdit = blob;
+        }
+        closeCropModal();
+      }, 'image/webp', 0.8);
+    }
+
     function showToast(message, type = 'success') {
       const toast = document.getElementById('toast');
       toast.style.backgroundColor = type === 'success' ? '#28a745' : '#dc3545';
@@ -210,12 +315,12 @@ export function renderRestaurantHTML(res, items, categories, settings, origin, i
       submitBtn.disabled = true;
       submitBtn.innerText = 'جاري الرفع...';
 
-      const fileInput = form.querySelector('#imageInput');
       const imageUrlInput = form.querySelector('#imageUrl');
+      const blob = window.lastBlobAdd;
       
-      if (fileInput.files.length > 0) {
+      if (blob) {
         const formData = new FormData();
-        formData.append('image', fileInput.files[0]);
+        formData.append('image', blob, 'image.webp');
         formData.append('restaurant_id', ${res.id});
         
         try {
@@ -239,21 +344,30 @@ export function renderRestaurantHTML(res, items, categories, settings, origin, i
     }
 
     async function updateItem(form) {
-      const fileInput = form.querySelector('#editImageInput');
-      const imageUrlInput = form.querySelector('#editImageUrl');
+      const submitBtn = form.querySelector('button[type="submit"]');
+      submitBtn.disabled = true;
       
-      if (fileInput.files.length > 0) {
+      const imageUrlInput = form.querySelector('#editImageUrl');
+      const blob = window.lastBlobEdit;
+      
+      if (blob) {
         const formData = new FormData();
-        formData.append('image', fileInput.files[0]);
+        formData.append('image', blob, 'image.webp');
         formData.append('restaurant_id', ${res.id});
         
-        const response = await fetch('/upload/image', { method: 'POST', body: formData });
-        const data = await response.json();
-        if (data.error) {
-          alert(data.error);
-        } else {
-          imageUrlInput.value = data.url;
-          form.submit();
+        try {
+          const response = await fetch('/upload/image', { method: 'POST', body: formData });
+          const data = await response.json();
+          if (data.error) {
+            showToast(data.error, 'error');
+          } else {
+            imageUrlInput.value = data.url;
+            form.submit();
+          }
+        } catch (err) {
+          showToast('حدث خطأ: ' + err.message, 'error');
+        } finally {
+          submitBtn.disabled = false;
         }
       } else {
         form.submit();
