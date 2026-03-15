@@ -1,3 +1,6 @@
+// ==========================================
+// قالب إدارة الفئات
+// ==========================================
 export function renderCategoriesHTML(res, categories) {
   const rows = categories.map(c => `
     <tr>
