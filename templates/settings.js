@@ -1,3 +1,6 @@
+// ==========================================
+// قالب إعدادات المطعم
+// ==========================================
 export function renderSettingsHTML(res, settings, info) {
   return `<!DOCTYPE html>
 <html dir="rtl">
