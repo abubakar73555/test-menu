@@ -1,5 +1,5 @@
 // ==========================================
-// قالب صفحة المنيو العام
+// قالب صفحة المنيو العام وصفحة "عن المطعم"
 // ==========================================
 export function renderPublicMenuHTML(res, categories, uncategorized, settings, tableName, info) {
   const themeStyles = `
@@ -211,7 +211,7 @@ export function renderPublicMenuHTML(res, categories, uncategorized, settings, t
     `;
   }
 
-  if (uncategorized.length > 0) {
+  if (uncategorized && uncategorized.length > 0) {
     const itemsHtml = uncategorized.map(item => `
       <div class="item-card ${item.featured ? 'featured' : ''}">
         ${item.featured ? '<div class="featured-badge">⭐</div>' : ''}
