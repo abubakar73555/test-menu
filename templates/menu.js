@@ -342,15 +342,13 @@ export function renderPublicMenuHTML(res, categories, uncategorized, settings, t
         
         if (options.length > 0) {
           options.forEach(opt => {
-            optionsHtml += `
-              <div class="option-item">
-                <label style="display:flex; align-items:center; gap:10px; cursor:pointer;">
-                  <input type="checkbox" class="option-checkbox" data-id="${opt.id}" data-name="${opt.option_name}" data-price="${opt.option_price}" onchange="updateModalTotal()">
-                  <span>${opt.option_name}</span>
-                  ${opt.option_price > 0 ? '<span style="color:green;">(+' + opt.option_price + ' ريال)</span>' : ''}
-                </label>
-              </div>
-            `;
+            optionsHtml += '<div class="option-item">' +
+                '<label style="display:flex; align-items:center; gap:10px; cursor:pointer;">' +
+                  '<input type="checkbox" class="option-checkbox" data-id="' + opt.id + '" data-name="' + opt.option_name + '" data-price="' + opt.option_price + '" onchange="updateModalTotal()">' +
+                  '<span>' + opt.option_name + '</span>' +
+                  (opt.option_price > 0 ? '<span style="color:green;">(+' + opt.option_price + ' ريال)</span>' : '') +
+                '</label>' +
+              '</div>';
           });
         } else {
           optionsHtml += '<p style="color:#666;">لا توجد خيارات إضافية لهذه الوجبة</p>';
